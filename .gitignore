@@ -43,8 +43,8 @@ coverage/
 /data/
 
 .claude/
-
 # 忽略根目录下的示例/生成文件
 /CLAUDE.md
 /tsconfig.tsbuildinfo
 /nul
+

@@ -22,10 +22,10 @@ export class QuestioningService {
     this.playerService = new PlayerService(ctx)
   }
 
-  // 获取默认超时（秒），从仓库根目录 .cloude/timeout.json 读取；读取失败返回 60
+  // 获取默认超时（秒），从仓库根目录 src/config/timeout.json 读取；读取失败返回 60
   private getDefaultTimeoutSeconds(): number {
     try {
-      const cfgPath = path.join(process.cwd(), '.cloude', 'timeout.json')
+      const cfgPath = path.join(process.cwd(), 'src', 'config', 'timeout.json')
       if (fs.existsSync(cfgPath)) {
         const raw = fs.readFileSync(cfgPath, 'utf-8')
         const cfg = JSON.parse(raw)
@@ -34,7 +34,7 @@ export class QuestioningService {
         }
       }
     } catch (e) {
-      this.ctx.logger('xiuxian').warn('读取 .cloude/timeout.json 失败，使用默认超时 60s')
+      this.ctx.logger('xiuxian').warn('读取 src/config/timeout.json 失败，使用默认超时 60s')
     }
     return 60
   }
@@ -131,7 +131,7 @@ export class QuestioningService {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
     }
 
-    // 创建会话（会话级超时来自 .cloude/timeout.json 或使用默认 60s）
+    // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
     const session: QuestioningSession = {
       userId,
       pathId,
@@ -444,7 +444,7 @@ export class QuestioningService {
       return { success: false, message: '未找到步入仙途路径' }
     }
 
-    // 创建会话（会话级超时来自 .cloude/timeout.json 或使用默认 60s）
+    // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
     const session: QuestioningSession = {
       userId,
       pathId: path.id,
@@ -501,7 +501,7 @@ export class QuestioningService {
       return cooldownResult as any
     }
 
-    // 创建会话（会话级超时来自 .cloude/timeout.json 或使用默认 60s）
+    // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
     const session: QuestioningSession = {
       userId,
       pathId: path.id,

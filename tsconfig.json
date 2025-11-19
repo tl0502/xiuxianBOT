@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "nodenext",
     "declaration": true,
     "outDir": "lib",
     "rootDir": "src",
@@ -9,7 +9,7 @@
     "incremental": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "strict": true,
     "resolveJsonModule": true,
     "noUnusedLocals": true,

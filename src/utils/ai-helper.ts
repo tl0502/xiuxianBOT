@@ -69,8 +69,44 @@ export class AIHelper {
    * 调用 ChatLuna - 步入仙途模式
    */
   private async callChatLunaForInitiation(answers: string[]): Promise<string> {
-    // 暂时返回智能模拟响应
-    this.ctx.logger('xiuxian').info('使用智能模拟 AI 响应（步入仙途）')
+    // 检查 xiuxianAI 服务是否可用
+    const aiService = this.ctx.xiuxianAI
+    if (!aiService || !aiService.isAvailable()) {
+      this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
+      return this.getMockInitiationResponse(answers)
+    }
+
+    try {
+      this.ctx.logger('xiuxian').info('通过 ChatLuna 调用 AI（步入仙途）')
+
+      // 构建 prompt
+      const prompt = `你是一个修仙世界的天道判官，负责为新入门的修士分配道号和灵根。
+
+请根据以下回答生成 JSON 响应：
+第1题答案：${answers[0]}
+第2题答案：${answers[1]}
+第3题答案（开放题）：${answers[2]}
+
+要求：
+1. daoName（道号）：2-4个汉字，要体现修士的性格特点
+2. spiritualRoot（灵根类型）：从以下选择一个：light, dark, metal, wood, water, fire, earth, qi, pseudo, ha
+3. personality（性格评语）：50字以内，评价修士的性格和潜力
+4. reason（分配理由）：50字以内，说明为什么分配这个道号和灵根
+
+仅返回 JSON 对象，不要添加任何其他说明。格式：
+{"daoName":"道号","spiritualRoot":"灵根类型","personality":"性格评语","reason":"分配理由"}`
+
+      // 调用 AI 服务
+      const response = await aiService.generate(prompt)
+      if (response) {
+        this.ctx.logger('xiuxian').info('AI 响应成功')
+        return response
+      }
+    } catch (error) {
+      this.ctx.logger('xiuxian').error('调用 ChatLuna 失败:', error)
+    }
+
+    // 回退到模拟响应
     return this.getMockInitiationResponse(answers)
   }
 
@@ -78,8 +114,35 @@ export class AIHelper {
    * 调用 ChatLuna - 试炼问心模式
    */
   private async callChatLunaForTrial(): Promise<string> {
-    // 暂时返回模拟响应
-    this.ctx.logger('xiuxian').info('使用模拟 AI 响应（试炼问心）')
+    const aiService = this.ctx.xiuxianAI
+    if (!aiService || !aiService.isAvailable()) {
+      this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
+      return this.getMockTrialResponse()
+    }
+
+    try {
+      this.ctx.logger('xiuxian').info('通过 ChatLuna 调用 AI（试炼问心）')
+
+      const prompt = `你是一个修仙世界的天道判官，负责评估修士的问心试炼。
+
+请生成 JSON 响应：
+1. personality（性格评语）：评价修士在试炼中展现的性格
+2. tendency（问心倾向）：修士的修行倾向，如"智慧型"、"战斗型"等
+3. reward（奖励）：包含 type（"cultivation"或"spiritStone"）和 value（数值，200-500）
+4. reason（奖励原因）：说明为什么给予这个奖励
+
+仅返回 JSON 对象。格式：
+{"personality":"性格评语","tendency":"问心倾向","reward":{"type":"cultivation","value":300},"reason":"奖励原因"}`
+
+      const response = await aiService.generate(prompt)
+      if (response) {
+        this.ctx.logger('xiuxian').info('AI 响应成功')
+        return response
+      }
+    } catch (error) {
+      this.ctx.logger('xiuxian').error('调用 ChatLuna 失败:', error)
+    }
+
     return this.getMockTrialResponse()
   }
 
@@ -278,12 +341,5 @@ export class AIHelper {
       },
       reason: '完成问心，获得修为奖励'
     }
-  }
-}
-
-// 扩展 Context 类型（如果需要注入 chatluna）
-declare module 'koishi' {
-  interface Context {
-    chatluna?: any
   }
 }
