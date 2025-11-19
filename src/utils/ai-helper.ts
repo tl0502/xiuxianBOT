@@ -30,7 +30,16 @@ export class AIHelper {
       return result
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
-      // 返回默认响应
+
+      // 检查是否允许降级
+      const aiService = this.ctx.xiuxianAI
+      if (!aiService?.isFallbackEnabled()) {
+        // 不允许降级，重新抛出错误
+        throw error
+      }
+
+      // 允许降级，返回默认响应
+      this.ctx.logger('xiuxian').warn('使用默认响应作为降级方案')
       return this.getDefaultInitiationResponse()
     }
   }
@@ -60,7 +69,16 @@ export class AIHelper {
       return result
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
-      // 返回默认奖励
+
+      // 检查是否允许降级
+      const aiService = this.ctx.xiuxianAI
+      if (!aiService?.isFallbackEnabled()) {
+        // 不允许降级，重新抛出错误
+        throw error
+      }
+
+      // 允许降级，返回默认奖励
+      this.ctx.logger('xiuxian').warn('使用默认响应作为降级方案')
       return this.getDefaultTrialResponse()
     }
   }
@@ -72,6 +90,11 @@ export class AIHelper {
     // 检查 xiuxianAI 服务是否可用
     const aiService = this.ctx.xiuxianAI
     if (!aiService || !aiService.isAvailable()) {
+      // 检查是否允许降级
+      if (!aiService?.isFallbackEnabled()) {
+        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用模拟降级')
+        throw new Error('AI 服务不可用，请联系管理员配置 ChatLuna 或启用模拟降级')
+      }
       this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
       return this.getMockInitiationResponse(answers)
     }
@@ -106,7 +129,14 @@ export class AIHelper {
       this.ctx.logger('xiuxian').error('调用 ChatLuna 失败:', error)
     }
 
+    // AI 调用失败，检查是否允许降级
+    if (!aiService.isFallbackEnabled()) {
+      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用模拟降级')
+      throw new Error('AI 调用失败，请稍后重试或联系管理员')
+    }
+
     // 回退到模拟响应
+    this.ctx.logger('xiuxian').warn('AI 调用失败，降级使用模拟响应')
     return this.getMockInitiationResponse(answers)
   }
 
@@ -116,6 +146,11 @@ export class AIHelper {
   private async callChatLunaForTrial(): Promise<string> {
     const aiService = this.ctx.xiuxianAI
     if (!aiService || !aiService.isAvailable()) {
+      // 检查是否允许降级
+      if (!aiService?.isFallbackEnabled()) {
+        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用模拟降级')
+        throw new Error('AI 服务不可用，请联系管理员配置 ChatLuna 或启用模拟降级')
+      }
       this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
       return this.getMockTrialResponse()
     }
@@ -143,6 +178,14 @@ export class AIHelper {
       this.ctx.logger('xiuxian').error('调用 ChatLuna 失败:', error)
     }
 
+    // AI 调用失败，检查是否允许降级
+    if (!aiService.isFallbackEnabled()) {
+      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用模拟降级')
+      throw new Error('AI 调用失败，请稍后重试或联系管理员')
+    }
+
+    // 回退到模拟响应
+    this.ctx.logger('xiuxian').warn('AI 调用失败，降级使用模拟响应')
     return this.getMockTrialResponse()
   }
 

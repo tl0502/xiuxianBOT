@@ -7,10 +7,14 @@ import { ComputedRef } from '@vue/reactivity'
 
 export interface Config {
   model: string
+  enableFallback: boolean
 }
 
 export const Config: Schema<Config> = Schema.object({
-  model: Schema.dynamic('model').description('AI 模型（用于问心系统）')
+  model: Schema.dynamic('model').description('AI 模型（用于问心系统）'),
+  enableFallback: Schema.boolean()
+    .default(false)
+    .description('AI 失败时是否自动使用模拟响应（禁用可防止作弊，但 AI 故障时功能不可用）')
 })
 
 /**
@@ -69,6 +73,13 @@ export class XiuxianAIService extends Service {
    */
   isAvailable(): boolean {
     return !!this.modelRef?.value
+  }
+
+  /**
+   * 检查是否允许降级到模拟响应
+   */
+  isFallbackEnabled(): boolean {
+    return this.config.enableFallback
   }
 }
 
