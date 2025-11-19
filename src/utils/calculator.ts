@@ -1,13 +1,43 @@
 import { Player } from '../types/player'
 import { REALMS, REALM_LEVELS, GameConfig } from '../config/constants'
+import {
+  SpiritualRootType,
+  SPIRITUAL_ROOTS,
+  getSpiritualRoot,
+  getSpiritualRootDisplayName
+} from '../config/spiritual-roots'
+
+/**
+ * 获取灵根的修炼加成
+ */
+export function getSpiritualRootCultivationBonus(spiritualRoot: string): number {
+  const root = SPIRITUAL_ROOTS[spiritualRoot as SpiritualRootType]
+  return root?.bonuses?.cultivation || 1
+}
+
+/**
+ * 获取灵根的突破加成
+ */
+export function getSpiritualRootBreakthroughBonus(spiritualRoot: string): number {
+  const root = SPIRITUAL_ROOTS[spiritualRoot as SpiritualRootType]
+  return root?.bonuses?.breakthrough || 0
+}
+
+/**
+ * 获取灵根的战力加成
+ */
+export function getSpiritualRootCombatBonus(spiritualRoot: string): number {
+  const root = SPIRITUAL_ROOTS[spiritualRoot as SpiritualRootType]
+  return root?.bonuses?.combatPower || 1
+}
 
 /**
  * 计算修炼速度（每小时获得的修为）
  */
 export function calculateCultivationSpeed(player: Player): number {
   const baseSpeed = GameConfig.CULTIVATION_BASE_SPEED
-  const spiritualRootBonus = player.spiritualRoot * GameConfig.CULTIVATION_SPIRITUAL_ROOT_MULTIPLIER
-  return Math.floor(baseSpeed + spiritualRootBonus)
+  const cultivationMultiplier = getSpiritualRootCultivationBonus(player.spiritualRoot)
+  return Math.floor(baseSpeed * cultivationMultiplier)
 }
 
 /**
@@ -23,8 +53,8 @@ export function calculateCultivationGain(player: Player, hours: number): number 
  */
 export function calculateBreakthroughRate(player: Player): number {
   const baseRate = GameConfig.BREAKTHROUGH_BASE_RATE
-  const spiritualRootBonus = player.spiritualRoot * GameConfig.BREAKTHROUGH_SPIRITUAL_ROOT_BONUS
-  const rate = baseRate + spiritualRootBonus
+  const breakthroughBonus = getSpiritualRootBreakthroughBonus(player.spiritualRoot)
+  const rate = baseRate + breakthroughBonus
 
   // 确保在 0-1 之间
   return Math.min(1, Math.max(0, rate))
@@ -37,9 +67,9 @@ export function calculateCombatPower(player: Player): number {
   // 基础战力 = 境界 * 1000 + 境界等级 * 200
   const basePower = player.realm * 1000 + player.realmLevel * 200
   // 灵根加成
-  const spiritualRootBonus = player.spiritualRoot * 10
+  const combatMultiplier = getSpiritualRootCombatBonus(player.spiritualRoot)
   // 总战力
-  return basePower + spiritualRootBonus
+  return Math.floor(basePower * combatMultiplier)
 }
 
 /**
@@ -67,4 +97,15 @@ export function getNextRealmMaxCultivation(realm: number, realmLevel: number): n
 
   // 每个小境界占总差值的 25%
   return Math.floor(previousRealmMax + difference * (realmLevel + 1) / 4)
+}
+
+/**
+ * 获取灵根信息文本
+ */
+export function getSpiritualRootInfo(spiritualRoot: string): { name: string; description: string } {
+  const root = getSpiritualRoot(spiritualRoot as SpiritualRootType)
+  return {
+    name: getSpiritualRootDisplayName(spiritualRoot as SpiritualRootType),
+    description: root?.description || '未知灵根'
+  }
 }

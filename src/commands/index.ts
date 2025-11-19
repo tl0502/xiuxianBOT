@@ -14,7 +14,7 @@ export function registerCommands(ctx: Context) {
   const questioningService = new QuestioningService(ctx)
 
   // 注册各模块命令
-  registerPlayerCommands(ctx, playerService)
+  registerPlayerCommands(ctx, playerService, questioningService)
   registerCultivationCommands(ctx, playerService)
   registerQuestioningCommands(ctx, playerService, questioningService)
 }

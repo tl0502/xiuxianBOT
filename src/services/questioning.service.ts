@@ -1,9 +1,11 @@
 import { Context } from 'koishi'
-import { QUESTIONING_PATHS, QuestioningPath } from '../config/questioning'
+import { ALL_PATHS, QuestioningPath, PathPackageType, getRandomPath } from '../config/questioning'
 import { QuestioningSession, ServiceResult, QuestioningResult } from '../types/questioning'
 import { Player } from '../types/player'
 import { AIHelper } from '../utils/ai-helper'
 import { getRealmName } from '../utils/calculator'
+import { PlayerService } from './player.service'
+import { SpiritualRootType } from '../config/spiritual-roots'
 
 /**
  * 问心服务类
@@ -11,16 +13,22 @@ import { getRealmName } from '../utils/calculator'
 export class QuestioningService {
   private sessions: Map<string, QuestioningSession> = new Map()
   private aiHelper: AIHelper
+  private playerService: PlayerService
 
   constructor(private ctx: Context) {
     this.aiHelper = new AIHelper(ctx)
+    this.playerService = new PlayerService(ctx)
   }
 
   /**
    * 获取所有可用的问心路径
    */
   getAvailablePaths(player: Player): QuestioningPath[] {
-    return QUESTIONING_PATHS.filter(path => {
+    return ALL_PATHS.filter(path => {
+      // 过滤掉步入仙途路径（那是创角专用的）
+      if (path.packageType === PathPackageType.INITIATION) {
+        return false
+      }
       // 检查境界要求
       if (path.minRealm !== undefined && player.realm < path.minRealm) {
         return false
@@ -33,7 +41,7 @@ export class QuestioningService {
    * 根据 ID 获取路径
    */
   getPathById(pathId: string): QuestioningPath | null {
-    return QUESTIONING_PATHS.find(p => p.id === pathId) || null
+    return ALL_PATHS.find(p => p.id === pathId) || null
   }
 
   /**
@@ -46,7 +54,7 @@ export class QuestioningService {
     }
 
     // 查询最近一次该路径的问心记录
-    const records = await this.ctx.database.get('xiuxian_questioning_v2', {
+    const records = await this.ctx.database.get('xiuxian_questioning_v3', {
       userId,
       pathId
     }, {
@@ -146,8 +154,12 @@ export class QuestioningService {
 
     // 检查是否完成所有问题
     if (session.currentStep >= 3) {
-      // 完成问心，开始 AI 评估
-      return await this.completeQuestioning(userId, session, path)
+      // 完成问心，根据路径类型选择不同的处理方式
+      if (path.packageType === PathPackageType.INITIATION) {
+        return await this.completeInitiationQuestioning(userId, session, path)
+      } else {
+        return await this.completeQuestioning(userId, session, path)
+      }
     }
 
     // 进入下一题
@@ -176,7 +188,7 @@ export class QuestioningService {
   ): Promise<ServiceResult<QuestioningResult>> {
     try {
       // 获取玩家信息
-      const [player] = await this.ctx.database.get('xiuxian_player_v2', { userId })
+      const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
       if (!player) {
         this.sessions.delete(userId)
         return { success: false, message: '玩家信息不存在' }
@@ -193,7 +205,7 @@ export class QuestioningService {
       )
 
       // 保存记录到数据库
-      await this.ctx.database.create('xiuxian_questioning_v2', {
+      await this.ctx.database.create('xiuxian_questioning_v3', {
         userId,
         pathId: path.id,
         pathName: path.name,
@@ -244,28 +256,21 @@ export class QuestioningService {
    * 应用奖励
    */
   private async applyReward(userId: string, type: string, value: number): Promise<void> {
-    const [player] = await this.ctx.database.get('xiuxian_player_v2', { userId })
+    const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
     if (!player) return
 
     switch (type) {
       case 'cultivation':
         // 增加修为（不超过上限）
         const newCultivation = Math.min(player.cultivation + value, player.cultivationMax)
-        await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+        await this.ctx.database.set('xiuxian_player_v3', { userId }, {
           cultivation: newCultivation
-        })
-        break
-
-      case 'spiritualRoot':
-        // 增加灵根
-        await this.ctx.database.set('xiuxian_player_v2', { userId }, {
-          spiritualRoot: player.spiritualRoot + value
         })
         break
 
       case 'spiritStone':
         // 增加灵石
-        await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+        await this.ctx.database.set('xiuxian_player_v3', { userId }, {
           spiritStone: player.spiritStone + value
         })
         break
@@ -285,14 +290,173 @@ export class QuestioningService {
     switch (type) {
       case 'cultivation':
         return `+${value} 修为`
-      case 'spiritualRoot':
-        return `+${value} 灵根`
       case 'spiritStone':
         return `+${value} 灵石`
       case 'breakthrough':
         return `下次突破成功率 +${(value * 100).toFixed(0)}%`
       default:
         return '未知奖励'
+    }
+  }
+
+  /**
+   * 开始步入仙途问心（随机选择一条 INITIATION 路径）
+   */
+  async startInitiationQuestioning(userId: string): Promise<ServiceResult<{ pathName: string; pathDescription: string; question: string; options?: string[] }>> {
+    // 检查是否已有进行中的问心
+    if (this.sessions.has(userId)) {
+      return { success: false, message: '你正在进行问心，请先完成或取消' }
+    }
+
+    // 随机选择一条步入仙途路径
+    const path = getRandomPath(PathPackageType.INITIATION)
+    if (!path) {
+      return { success: false, message: '未找到步入仙途路径' }
+    }
+
+    // 创建会话
+    const session: QuestioningSession = {
+      userId,
+      pathId: path.id,
+      currentStep: 1,
+      answers: [],
+      startTime: new Date()
+    }
+    this.sessions.set(userId, session)
+
+    // 返回第一题
+    const firstQuestion = path.questions[0]
+    return {
+      success: true,
+      message: '步入仙途问心开始',
+      data: {
+        pathName: path.name,
+        pathDescription: path.description,
+        question: firstQuestion.question,
+        options: firstQuestion.options?.map(o => o.text)
+      }
+    }
+  }
+
+  /**
+   * 开始试炼问心（随机选择一条 TRIAL 路径）
+   */
+  async startRandomTrialQuestioning(userId: string, player: Player): Promise<ServiceResult<{ pathName: string; pathDescription: string; question: string; options?: string[] }>> {
+    // 检查是否已有进行中的问心
+    if (this.sessions.has(userId)) {
+      return { success: false, message: '你正在进行问心，请先完成或取消' }
+    }
+
+    // 随机选择一条试炼路径
+    const path = getRandomPath(PathPackageType.TRIAL)
+    if (!path) {
+      return { success: false, message: '未找到试炼路径' }
+    }
+
+    // 检查境界要求
+    if (path.minRealm !== undefined && player.realm < path.minRealm) {
+      return {
+        success: false,
+        message: `需要达到 ${getRealmName(path.minRealm, 0)} 才能进行此问心`
+      }
+    }
+
+    // 检查冷却
+    const cooldownResult = await this.checkCooldown(userId, path.id)
+    if (!cooldownResult.success) {
+      return cooldownResult as any
+    }
+
+    // 创建会话
+    const session: QuestioningSession = {
+      userId,
+      pathId: path.id,
+      currentStep: 1,
+      answers: [],
+      startTime: new Date()
+    }
+    this.sessions.set(userId, session)
+
+    // 返回第一题
+    const firstQuestion = path.questions[0]
+    return {
+      success: true,
+      message: '试炼问心开始',
+      data: {
+        pathName: path.name,
+        pathDescription: path.description,
+        question: firstQuestion.question,
+        options: firstQuestion.options?.map(o => o.text)
+      }
+    }
+  }
+
+  /**
+   * 完成步入仙途问心（AI 分配道号和灵根，然后创建玩家）
+   */
+  private async completeInitiationQuestioning(
+    userId: string,
+    session: QuestioningSession,
+    path: QuestioningPath
+  ): Promise<ServiceResult<any>> {
+    try {
+      // 调用 AI 评估（步入仙途模式）
+      const questions = path.questions.map(q => q.question)
+      const aiResponse = await this.aiHelper.generateInitiationResponse(
+        path.name,
+        path.description,
+        questions,
+        session.answers
+      )
+
+      // 使用 AI 分配的道号和灵根创建玩家
+      const createResult = await this.playerService.create({
+        userId,
+        username: aiResponse.daoName,
+        spiritualRoot: aiResponse.spiritualRoot as SpiritualRootType
+      })
+
+      if (!createResult.success || !createResult.data) {
+        this.sessions.delete(userId)
+        return createResult
+      }
+
+      // 保存问心记录到数据库
+      await this.ctx.database.create('xiuxian_questioning_v3', {
+        userId,
+        pathId: path.id,
+        pathName: path.name,
+        answer1: session.answers[0],
+        answer2: session.answers[1],
+        answer3: session.answers[2],
+        aiResponse: JSON.stringify(aiResponse),
+        personality: aiResponse.personality,
+        tendency: '',
+        rewardType: 'initiation',
+        rewardValue: 0,
+        rewardReason: aiResponse.reason,
+        createTime: new Date()
+      })
+
+      // 清除会话
+      this.sessions.delete(userId)
+
+      // 返回结果
+      return {
+        success: true,
+        message: '步入仙途成功',
+        data: {
+          player: createResult.data.player,
+          daoName: aiResponse.daoName,
+          spiritualRoot: aiResponse.spiritualRoot,
+          personality: aiResponse.personality,
+          reason: aiResponse.reason
+        }
+      }
+    } catch (error) {
+      this.ctx.logger('xiuxian').error('步入仙途问心完成流程错误:', error)
+      this.sessions.delete(userId)
+      return { success: false, message: '问心评估失败，请稍后重试' }
     }
   }
 
@@ -327,7 +491,7 @@ export class QuestioningService {
    */
   async getHistory(userId: string, limit: number = 5): Promise<ServiceResult> {
     try {
-      const records = await this.ctx.database.get('xiuxian_questioning_v2', {
+      const records = await this.ctx.database.get('xiuxian_questioning_v3', {
         userId
       }, {
         sort: { createTime: 'desc' },

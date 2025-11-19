@@ -6,9 +6,10 @@ import {
   getRealmName,
   getNextRealmMaxCultivation,
   calculateCultivationSpeed,
-  calculateBreakthroughRate
+  calculateBreakthroughRate,
+  getSpiritualRootInfo
 } from '../utils/calculator'
-import { randomInt, randomSuccess } from '../utils/random'
+import { randomSuccess } from '../utils/random'
 import { formatDate } from '../utils/formatter'
 
 /**
@@ -21,7 +22,7 @@ export class PlayerService {
    * 获取玩家信息
    */
   async getPlayer(userId: string): Promise<Player | null> {
-    const [player] = await this.ctx.database.get('xiuxian_player_v2', { userId })
+    const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
     return player || null
   }
 
@@ -34,9 +35,9 @@ export class PlayerService {
   }
 
   /**
-   * 创建新玩家
+   * 创建新玩家（由 AI 分配道号和灵根）
    */
-  async create(input: CreatePlayerInput): Promise<ServiceResult<{ player: Player; spiritualRoot: number }>> {
+  async create(input: CreatePlayerInput): Promise<ServiceResult<{ player: Player }>> {
     // 检查是否已存在
     const existing = await this.getPlayer(input.userId)
     if (existing) {
@@ -46,20 +47,17 @@ export class PlayerService {
       }
     }
 
-    // 随机生成灵根
-    const spiritualRoot = randomInt(GameConfig.MIN_SPIRITUAL_ROOT, GameConfig.MAX_SPIRITUAL_ROOT)
-
-    // 创建玩家
-    const player = await this.ctx.database.create('xiuxian_player_v2', {
+    // 创建玩家（使用 AI 分配的道号和灵根）
+    const player = await this.ctx.database.create('xiuxian_player_v3', {
       userId: input.userId,
-      username: input.username,
+      username: input.username,  // AI 分配的道号
+      spiritualRoot: input.spiritualRoot,  // AI 分配的灵根
       realm: GameConfig.INITIAL_REALM,
       realmLevel: GameConfig.INITIAL_REALM_LEVEL,
       cultivation: GameConfig.INITIAL_CULTIVATION,
-      cultivationMax: REALMS[0].maxCultivation / 4, // 初期需要的修��
+      cultivationMax: REALMS[0].maxCultivation / 4,
       spiritStone: GameConfig.INITIAL_SPIRIT_STONE,
-      spiritualRoot,
-      combatPower: spiritualRoot * 10, // 初始战力
+      combatPower: 0,  // 初始战力，会在下面计算
       status: PlayerStatus.IDLE,
       statusEndTime: null,
       sectId: null,
@@ -70,10 +68,19 @@ export class PlayerService {
       totalCombatLose: 0,
     })
 
+    // 计算初始战力
+    const combatPower = calculateCombatPower(player)
+    await this.ctx.database.set('xiuxian_player_v3', { userId: input.userId }, {
+      combatPower
+    })
+
+    // 重新获取更新后的玩家数据
+    const updatedPlayer = await this.getPlayer(input.userId)
+
     return {
       success: true,
-      data: { player, spiritualRoot },
-      message: '���建成功'
+      data: { player: updatedPlayer! },
+      message: '创建成功'
     }
   }
 
@@ -89,6 +96,8 @@ export class PlayerService {
       }
     }
 
+    const spiritualRootInfo = getSpiritualRootInfo(player.spiritualRoot)
+
     return {
       success: true,
       data: {
@@ -97,7 +106,8 @@ export class PlayerService {
         cultivation: player.cultivation,
         cultivationMax: player.cultivationMax,
         spiritStone: player.spiritStone,
-        spiritualRoot: player.spiritualRoot,
+        spiritualRoot: spiritualRootInfo.name,
+        spiritualRootDesc: spiritualRootInfo.description,
         combatPower: calculateCombatPower(player),
         createDate: formatDate(player.createTime)
       },
@@ -121,7 +131,7 @@ export class PlayerService {
     const speed = calculateCultivationSpeed(player)
     const endTime = new Date(Date.now() + hours * 60 * 60 * 1000)
 
-    await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+    await this.ctx.database.set('xiuxian_player_v3', { userId }, {
       status: PlayerStatus.CULTIVATING,
       statusEndTime: endTime,
       lastActiveTime: new Date()
@@ -147,7 +157,7 @@ export class PlayerService {
       return { success: false, message: '你当前并未在修炼中' }
     }
 
-    // 计算实际修炼时间（小��）
+    // 计算实际修炼时间（小时）
     const startTime = player.lastActiveTime.getTime()
     const endTime = Math.min(Date.now(), new Date(player.statusEndTime).getTime())
     const hours = (endTime - startTime) / (60 * 60 * 1000)
@@ -158,7 +168,7 @@ export class PlayerService {
     const newCultivation = Math.min(player.cultivation + gained, player.cultivationMax)
 
     // 更新数据
-    await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+    await this.ctx.database.set('xiuxian_player_v3', { userId }, {
       cultivation: newCultivation,
       status: PlayerStatus.IDLE,
       statusEndTime: null,
@@ -215,7 +225,7 @@ export class PlayerService {
       const newCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
       const newCombatPower = calculateCombatPower({ ...player, realm: newRealm, realmLevel: newRealmLevel })
 
-      await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+      await this.ctx.database.set('xiuxian_player_v3', { userId }, {
         realm: newRealm,
         realmLevel: newRealmLevel,
         cultivation: 0,
@@ -235,7 +245,7 @@ export class PlayerService {
       }
     } else {
       // 突破失败，修为清空
-      await this.ctx.database.set('xiuxian_player_v2', { userId }, {
+      await this.ctx.database.set('xiuxian_player_v3', { userId }, {
         cultivation: 0,
         lastActiveTime: new Date()
       })

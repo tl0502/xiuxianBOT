@@ -3,7 +3,10 @@ import { initDatabase } from './database'
 import { registerCommands } from './commands'
 
 export const name = 'xiuxian-txl'
-export const inject = ['database']
+export const inject = {
+  required: ['database'],
+  optional: ['chatluna']
+}
 
 export interface Config {}
 

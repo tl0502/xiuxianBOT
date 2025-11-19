@@ -3,12 +3,13 @@
  */
 
 import { PlayerStatus } from '../config/constants'
+import { SpiritualRootType } from '../config/spiritual-roots'
 
 // 玩家数据库模型
 export interface Player {
   id: number                    // 自增主键
   userId: string                // QQ用户ID（平台ID）
-  username: string              // 玩家道号
+  username: string              // 玩家道号（AI分配）
 
   // 境界相关
   realm: number                 // 大境界（0-8）
@@ -20,7 +21,7 @@ export interface Player {
   spiritStone: number           // 灵石
 
   // 属性
-  spiritualRoot: number         // 灵根（1-100）
+  spiritualRoot: string         // 灵根类型（SpiritualRootType）
   combatPower: number           // 战力
 
   // 状态
@@ -40,10 +41,11 @@ export interface Player {
   totalCombatLose: number       // 总败场
 }
 
-// 创建玩家时的输入
+// 创建玩家时的输入（由 AI 生成）
 export interface CreatePlayerInput {
   userId: string
-  username: string
+  username: string              // AI ��配的道号
+  spiritualRoot: SpiritualRootType  // AI 分配的灵根
 }
 
 // 玩家信息展示
@@ -53,7 +55,8 @@ export interface PlayerDisplayInfo {
   cultivation: number
   cultivationMax: number
   spiritStone: number
-  spiritualRoot: number
+  spiritualRoot: string         // 灵根显示名称
+  spiritualRootDesc: string     // 灵根描述
   combatPower: number
   createDate: string
 }

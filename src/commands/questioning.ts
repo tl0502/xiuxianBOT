@@ -2,7 +2,7 @@ import { Context, h } from 'koishi'
 import { QuestioningService } from '../services/questioning.service'
 import { PlayerService } from '../services/player.service'
 import { atMessage } from '../utils/formatter'
-import { getRealmName } from '../utils/calculator'
+import { getRealmName, getSpiritualRootInfo } from '../utils/calculator'
 
 /**
  * 注册问心相关命令
@@ -14,7 +14,7 @@ export function registerQuestioningCommands(
 ) {
 
   /**
-   * 问心列表
+   * 问心列表（仅显示信息，实际使用时会随机选择）
    */
   ctx.command('问心列表', '查看可用的问心路径')
     .action(async ({ session }) => {
@@ -39,6 +39,7 @@ export function registerQuestioningCommands(
         }
 
         let message = '\n\n━━━━ 问心路径 ━━━━\n\n'
+        message += '💫 使用 问心 命令将随机进入以下路径之一：\n\n'
 
         for (const path of paths) {
           message += `📖 ${path.name}\n`
@@ -52,13 +53,7 @@ export function registerQuestioningCommands(
             message += `   冷却时间：${path.cooldown}小时\n`
           }
 
-          message += `   使用命令：问心 ${path.id}\n\n`
-
-          // 检查冷却
-          const cooldownResult = await questioningService.checkCooldown(session.userId, path.id)
-          if (!cooldownResult.success) {
-            message += `   ⏰ ${cooldownResult.message}\n\n`
-          }
+          message += '\n'
         }
 
         message += '━━━━━━━━━━━━━━'
@@ -77,16 +72,11 @@ export function registerQuestioningCommands(
     })
 
   /**
-   * 开始问心
+   * 开始问心（随机选择路径）
    */
-  ctx.command('问心 <pathId:string>', '开始问心')
-    .action(async ({ session }, pathId) => {
+  ctx.command('问心', '进行问心试炼（随机路径）')
+    .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
-      if (!pathId) {
-        return h('', [
-          atMessage(session.userId, ' 请指定问心路径，使用 问心列表 查看可用路径')
-        ])
-      }
 
       try {
         // 获取玩家信息
@@ -97,23 +87,22 @@ export function registerQuestioningCommands(
           ])
         }
 
-        // 开始问心
-        const result = await questioningService.startQuestioning(session.userId, pathId, player)
+        // 随机选择一条试炼路径
+        const result = await questioningService.startRandomTrialQuestioning(session.userId, player)
 
-        if (!result.success) {
+        if (!result.success || !result.data) {
           return h('', [
             atMessage(session.userId, ' ' + result.message)
           ])
         }
 
-        const path = questioningService.getPathById(pathId)
-        let message = `\n\n━━━━ ${path?.name} ━━━━\n\n`
-        message += `${path?.description}\n\n`
-        message += `📝 问题 1/3：\n${result.data?.question}\n\n`
+        let message = `\n\n━━━━ ${result.data.pathName} ━━━━\n\n`
+        message += `${result.data.pathDescription}\n\n`
+        message += `📝 问题 1/3：\n${result.data.question}\n\n`
 
-        if (result.data?.options) {
-          result.data.options.forEach(opt => {
-            message += `${opt}\n`
+        if (result.data.options) {
+          result.data.options.forEach((opt, i) => {
+            message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
           message += `\n请回复选项字母（如：A）`
         } else {
@@ -223,14 +212,14 @@ export function registerQuestioningCommands(
         ])
       }
 
-      // 如果还有下一题
-      if (result.data && !result.data.success) {
+      // 如果还有下一题（检查是否有 step 字段）
+      if (result.data && result.data.step) {
         let message = `\n\n📝 问题 ${result.data.step}/3：\n`
         message += `${result.data.question}\n\n`
 
         if (result.data.options) {
-          result.data.options.forEach((opt: string) => {
-            message += `${opt}\n`
+          result.data.options.forEach((opt: string, i: number) => {
+            message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
           message += `\n请回复选项字母（如：A）`
         } else {
@@ -243,9 +232,33 @@ export function registerQuestioningCommands(
         ])
       }
 
-      // 问心完成
-      if (result.data?.success && result.data.data) {
-        const data = result.data.data
+      // 问心完成 - 检查是否有完成数据
+      if (result.data && result.data.player) {
+        // 步入仙途完成
+        const data = result.data
+        const spiritualRootInfo = getSpiritualRootInfo(data.player.spiritualRoot)
+
+        let message = '\n\n━━━━ 踏入仙途 ━━━━\n\n'
+        message += `✨ 恭喜你踏入修仙世界！\n\n`
+        message += `🎭 天道评语：\n${data.personality}\n\n`
+        message += `📜 分配依据：\n${data.reason}\n\n`
+        message += `━━━━ 你的信息 ━━━━\n\n`
+        message += `👤 道号：${data.daoName}\n`
+        message += `🌟 灵根：${spiritualRootInfo.name}\n`
+        message += `   ${spiritualRootInfo.description}\n\n`
+        message += `愿你在这修仙世界中破开虚妄，证得大道！\n\n`
+        message += `💡 使用 天道记录 查看完整信息\n\n`
+        message += `━━━━━━━━━━━━━━`
+
+        return h('', [
+          h('at', { id: session.userId }),
+          h('text', { content: message })
+        ])
+      }
+
+      // 试炼问心完成
+      if (result.data && result.data.tendency && result.data.reward) {
+        const data = result.data
         let message = '\n\n━━━━ 问心完成 ━━━━\n\n'
         message += `✨ ${data.personality}\n\n`
         message += `🎭 问心倾向：${data.tendency}\n\n`

@@ -1,11 +1,12 @@
 import { Context } from 'koishi'
 import { Player } from '../../types/player'
 import { PlayerStatus, GameConfig } from '../../config/constants'
+import { SpiritualRootType } from '../../config/spiritual-roots'
 
 // 扩展数据库类型
 declare module 'koishi' {
   interface Tables {
-    xiuxian_player_v2: Player
+    xiuxian_player_v3: Player
   }
 }
 
@@ -13,7 +14,7 @@ declare module 'koishi' {
  * 初始化玩家表
  */
 export function initPlayerModel(ctx: Context) {
-  ctx.model.extend('xiuxian_player_v2', {
+  ctx.model.extend('xiuxian_player_v3', {
     // 基础字段
     id: 'unsigned',
     userId: 'string',
@@ -29,7 +30,7 @@ export function initPlayerModel(ctx: Context) {
     spiritStone: { type: 'unsigned', initial: GameConfig.INITIAL_SPIRIT_STONE },
 
     // 属性
-    spiritualRoot: 'unsigned',
+    spiritualRoot: { type: 'string', initial: SpiritualRootType.PSEUDO }, // 灵根类型
     combatPower: { type: 'unsigned', initial: 0 },
 
     // 状态

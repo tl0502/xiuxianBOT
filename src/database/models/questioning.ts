@@ -4,7 +4,7 @@ import { QuestioningRecord } from '../../types/questioning'
 // 扩展数据库类型
 declare module 'koishi' {
   interface Tables {
-    xiuxian_questioning_v2: QuestioningRecord
+    xiuxian_questioning_v3: QuestioningRecord
   }
 }
 
@@ -12,7 +12,7 @@ declare module 'koishi' {
  * 初始化问心记录表
  */
 export function initQuestioningModel(ctx: Context) {
-  ctx.model.extend('xiuxian_questioning_v2', {
+  ctx.model.extend('xiuxian_questioning_v3', {
     // 主键
     id: 'unsigned',
 
