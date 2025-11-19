@@ -1,0 +1,20 @@
+# Koishi 配置示例 - koishi.yml
+
+# 方式一：使用完整插件名（推荐）
+plugins:
+  # 数据库插件（必需）
+  database-sqlite:
+    path: ./data/xiuxian.db
+
+  # 修仙插件 - 使用完整包名
+  koishi-plugin-xiuxian:
+    $path: D:\项目\修仙2
+
+# 方式二：使用波浪号前缀表示本地路径
+# plugins:
+#   ~xiuxian:
+#     $path: D:\项目\修仙2
+
+# 方式三：直接指定完整路径（需要 require）
+# plugins:
+#   $require: D:\项目\修仙2

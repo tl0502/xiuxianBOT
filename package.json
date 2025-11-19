@@ -1,0 +1,35 @@
+{
+  "name": "koishi-plugin-xiuxian-txl",
+  "version": "0.1.0",
+  "description": "QQ修仙游戏插件",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "author": "TXL",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "chatbot",
+    "koishi",
+    "plugin",
+    "xiuxian",
+    "game"
+  ],
+  "peerDependencies": {
+    "koishi": "^4.0.0"
+  },
+  "devDependencies": {
+    "koishi": "^4.17.0",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  },
+  "koishi": {
+    "description": {
+      "zh": "修仙世界游戏插件"
+    },
+    "service": {
+      "required": ["database"]
+    }
+  }
+}
