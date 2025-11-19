@@ -44,7 +44,7 @@ export interface Player {
 // 创建玩家时的输入（由 AI 生成）
 export interface CreatePlayerInput {
   userId: string
-  username: string              // AI ��配的道号
+  username: string              // AI 分配的道号
   spiritualRoot: SpiritualRootType  // AI 分配的灵根
 }
 

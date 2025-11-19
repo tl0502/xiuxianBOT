@@ -29,8 +29,13 @@ export interface QuestioningSession {
   userId: string
   pathId: string
   currentStep: number // 0: 未开始, 1-3: 对应题号
-  answers: string[]
+  // 答案可以是自由文本，也可以是选项对象 { letter: 'A', text: '选项内容' }
+  answers: Array<string | { letter: string; text: string }>
   startTime: Date
+  // 上一次出题时间，用于限时回答（每题倒计时）
+  lastQuestionTime?: Date
+  // 本会话生效的每题超时（秒），若未设置则使用默认值
+  timeoutSeconds?: number
 }
 
 /**

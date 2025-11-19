@@ -48,25 +48,40 @@ export class PlayerService {
     }
 
     // 创建玩家（使用 AI 分配的道号和灵根）
-    const player = await this.ctx.database.create('xiuxian_player_v3', {
-      userId: input.userId,
-      username: input.username,  // AI 分配的道号
-      spiritualRoot: input.spiritualRoot,  // AI 分配的灵根
-      realm: GameConfig.INITIAL_REALM,
-      realmLevel: GameConfig.INITIAL_REALM_LEVEL,
-      cultivation: GameConfig.INITIAL_CULTIVATION,
-      cultivationMax: REALMS[0].maxCultivation / 4,
-      spiritStone: GameConfig.INITIAL_SPIRIT_STONE,
-      combatPower: 0,  // 初始战力，会在下面计算
-      status: PlayerStatus.IDLE,
-      statusEndTime: null,
-      sectId: null,
-      sectContribution: 0,
-      createTime: new Date(),
-      lastActiveTime: new Date(),
-      totalCombatWin: 0,
-      totalCombatLose: 0,
-    })
+    let player: Player
+    try {
+      player = await this.ctx.database.create('xiuxian_player_v3', {
+        userId: input.userId,
+        username: input.username,  // AI 分配的道号
+        spiritualRoot: input.spiritualRoot,  // AI 分配的灵根
+        realm: GameConfig.INITIAL_REALM,
+        realmLevel: GameConfig.INITIAL_REALM_LEVEL,
+        cultivation: GameConfig.INITIAL_CULTIVATION,
+        cultivationMax: REALMS[0].maxCultivation / 4,
+        spiritStone: GameConfig.INITIAL_SPIRIT_STONE,
+        combatPower: 0,  // 初始战力，会在下面计算
+        status: PlayerStatus.IDLE,
+        statusEndTime: null,
+        sectId: null,
+        sectContribution: 0,
+        createTime: new Date(),
+        lastActiveTime: new Date(),
+        totalCombatWin: 0,
+        totalCombatLose: 0,
+      }) as unknown as Player
+    } catch (err: any) {
+      // 并发下可能触发唯一键冲突，这里做二次确认并友好提示
+      const existed = await this.getPlayer(input.userId)
+      if (existed) {
+        return {
+          success: false,
+          message: `你已踏入仙途，道号：${existed.username}`
+        }
+      }
+      // 其他错误向上抛出通用提示
+      this.ctx.logger('xiuxian').error('创建玩家失败:', err)
+      return { success: false, message: '创建玩家失败，请稍后再试' }
+    }
 
     // 计算初始战力
     const combatPower = calculateCombatPower(player)

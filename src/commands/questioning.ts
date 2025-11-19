@@ -109,6 +109,11 @@ export function registerQuestioningCommands(
           message += `请自由回答`
         }
 
+        // 若服务端返回限时提示，则在题目后追加显式提示
+        if (result.data.timeoutMessage) {
+          message += `\n\n${result.data.timeoutMessage}`
+        }
+
         return h('', [
           h('at', { id: session.userId }),
           h('text', { content: message })
@@ -224,6 +229,11 @@ export function registerQuestioningCommands(
           message += `\n请回复选项字母（如：A）`
         } else {
           message += `请自由回答`
+        }
+
+        // 附加倒计时提示（如果存在）
+        if (result.data.timeoutMessage) {
+          message += `\n\n${result.data.timeoutMessage}`
         }
 
         return h('', [

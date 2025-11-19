@@ -35,21 +35,26 @@ npm install
 npm run build
 ```
 
-### 2. 部署到 Koishi
+### 2. 部署到 Koishi（开发阶段推荐）
 
-将 `lib` 目录复制到 Koishi 插件目录：
+将构建产物复制到实例的插件目录，并在 `koishi.yml` 启用插件。
 
-```bash
-xcopy /E /Y D:\项目\修仙2\lib C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\node_modules\koishi-plugin-xiuxian-txl\lib
+```powershell
+# 1) 确保目标目录存在
+New-Item -ItemType Directory -Force -Path "C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\node_modules\koishi-plugin-xiuxian-txl\lib" | Out-Null
+
+# 2) 复制构建产物
+Copy-Item -Path "D:\项目\修仙2\lib\*" -Destination "C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\node_modules\koishi-plugin-xiuxian-txl\lib\" -Recurse -Force
 ```
 
-或在 `koishi.yml` 中使用本地路径：
+在实例的 `koishi.yml` 中启用插件：
 
 ```yaml
 plugins:
-  xiuxian-txl:
-    $path: D:\项目\修仙2
+  xiuxian-txl:xx2023: {}
 ```
+
+注：开发阶段不再使用 `npm link` 方式，以免引发跨盘/路径解析问题。
 
 ### 3. 配置数据库
 
@@ -123,6 +128,23 @@ koishi-plugin-xiuxian-txl/
 ├── package.json
 └── tsconfig.json
 ```
+
+## 最近变更（2025-11-19）
+
+- 强制选项答题严格化：选项题现在仅接受单个大写 ASCII 字母（A/B/C/D），会拒绝小写、全角、带标点或多字符输入，避免 `A.`、`Ａ`、`DH` 等被误判为合法答案。
+- 每题倒计时支持：对问心类对话（含 `步入仙途`、`问心`/试炼）增加每题限时机制，默认 60 秒；超时将中断会话并返回超时提示。
+- 会话级超时配置：超时值写入每个会话的 `timeoutSeconds` 字段（会话优先），如未设置则读取仓库根目录 `.cloude/timeout.json` 的 `defaultTimeoutSeconds`。
+- 返回题目时标注限时声明：服务端在返回题目数据中加入 `timeoutSeconds` 与 `timeoutMessage` 字段，命令层已将 `timeoutMessage` 明确附加到发送给用户的题目文本（例如：`本题限时 60 秒，请及时回复。`）。
+- 会话字段更新：`QuestioningSession` 新增 `lastQuestionTime?: Date` 与 `timeoutSeconds?: number`，用于倒计时起点与会话级超时。
+- 答案存储与反作弊：选项题以 `{ letter, text }` 形式保存（字母 + 选项文本），开放题保持原文本；同时保留并增强了 prompt-injection / 要求“给我天灵根”的反作弊检测逻辑。
+- 已运行 TypeScript 构建验证，相关修改通过了 `npm run build`。
+
+变更涉及文件（主要）：
+- `src/services/questioning.service.ts`：严格选项校验、会话级超时、lastQuestionTime、返回 timeout 字段与消息、反作弊处理。
+- `src/commands/questioning.ts`、`src/commands/player.ts`：将 `timeoutMessage` 拼接到发送的题目文本以便用户可见倒计时提示。
+- `src/types/questioning.ts`：新增 `lastQuestionTime` 与 `timeoutSeconds` 字段。
+- `.cloude/timeout.json`：新增（默认 `defaultTimeoutSeconds: 60`），用于修改全局默认超时（仅影响新会话）。
+
 
 ### 数据库表结构
 

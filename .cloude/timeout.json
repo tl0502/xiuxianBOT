@@ -1,0 +1,6 @@
+{
+  "defaultTimeoutSeconds": 60,
+  "enabledForWaitingConversations": true,
+  "note": "此文件用于配置全局等待对话的默认超时（秒）。若需要修改，请编辑 defaultTimeoutSeconds 的值。",
+  "example": "修改为 30 则每题限时 30 秒"
+}

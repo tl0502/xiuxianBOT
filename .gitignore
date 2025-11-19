@@ -3,11 +3,13 @@ node_modules/
 package-lock.json
 yarn.lock
 
-# 编译输出（明确以根目录为准）
+# 编译输出（仅忽略构建产物，避免误伤源码/脚本）
 /lib/
 /dist/
-*.js
-*.d.ts
+/lib/**/*.js
+/lib/**/*.d.ts
+/dist/**/*.js
+/dist/**/*.d.ts
 !src/**/*.ts
 
 # 日志
