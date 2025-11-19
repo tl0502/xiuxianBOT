@@ -3,9 +3,9 @@ node_modules/
 package-lock.json
 yarn.lock
 
-# 编译输出
-lib/
-dist/
+# 编译输出（明确以根目录为准）
+/lib/
+/dist/
 *.js
 *.d.ts
 !src/**/*.ts
@@ -38,6 +38,11 @@ coverage/
 # 数据库文件（如果本地测试用）
 *.db
 *.sqlite
-data/
+/data/
 
 .claude/
+
+# 忽略根目录下的示例/生成文件
+/CLAUDE.md
+/tsconfig.tsbuildinfo
+/nul

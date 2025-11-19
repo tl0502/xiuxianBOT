@@ -1,61 +1,59 @@
-# Koishi 修仙插件 (koishi-plugin-xiuxian)
+# Koishi 修仙插件 (koishi-plugin-xiuxian-txl)
 
 一个基于 Koishi 的 QQ 修仙游戏插件，带有 AI 辅助功能。
 
 ## 功能特性
 
-### 当前实现（v0.1.0 - 可行性测试版）
-- ✅ `.步入仙途` - 创建角色，开启修仙之旅
-- ✅ `.天道记录` - 查看个人修仙信息
+### 当前实现（v0.2.0 - 架构重构版）
+
+**玩家系统**
+- `步入仙途` - 创建角色，随机生成灵根资质
+- `天道记录` - 查看完整修仙信息（境界、修为、灵石、战力等）
+
+**修炼系统**
+- `打坐 [小时]` - 开始修炼，获得修为
+- `突破` - 尝试突破到更高境界
+
+### 境界系统
+练气 → 筑基 → 金丹 → 元婴 → 化神 → 炼虚 → 合体 → 渡劫 → 大乘
+
+每个大境界分为：初期 → 中期 → 后期 → 大圆满
 
 ### 计划功能
-- 🚧 修炼系统（打坐、突破、境界提升）
-- 🚧 战斗系统（PVE、PVP）
-- 🚧 物品系统（背包、商店）
+- 🚧 战斗系统（PVE历练、PVP切磋）
+- 🚧 物品系统（背包、商店、丹药）
+- 🚧 宗门系统（加入宗门、宗门任务）
 - 🚧 AI智能辅助（命令推荐、游戏指引）
 
 ## 部署方法
 
-### 方式一：本地开发部署
-
-#### 1. 编译插件
-
-在插件目录下执行：
+### 1. 编译插件
 
 ```bash
+cd D:\项目\修仙2
 npm install
 npm run build
 ```
 
-#### 2. 在 Koishi 中加载
+### 2. 部署到 Koishi
 
-有两种方式：
+将 `lib` 目录复制到 Koishi 插件目录：
 
-**方法 A：使用本地插件（推荐用于开发）**
+```bash
+xcopy /E /Y D:\项目\修仙2\lib C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\node_modules\koishi-plugin-xiuxian-txl\lib
+```
 
-在你的 Koishi 实例的 `koishi.yml` 配置文件中添加：
+或在 `koishi.yml` 中使用本地路径：
 
 ```yaml
 plugins:
-  xiuxian:
-    $path: D:\项目\修仙2  # 替换为你的插件实际路径
+  xiuxian-txl:
+    $path: D:\项目\修仙2
 ```
 
-**方法 B：npm link（开发模式）**
+### 3. 配置数据库
 
-```bash
-# 在插件目录下
-npm link
-
-# 在 Koishi 实例目录下
-npm link koishi-plugin-xiuxian
-```
-
-然后在 Koishi 控制台中启用插件。
-
-#### 3. 配置数据库
-
-确保你的 Koishi 已配置好数据库服务。推荐使用 SQLite（无需额外配置）：
+确保 Koishi 已配置数据库服务（推荐 SQLite）：
 
 ```yaml
 plugins:
@@ -63,67 +61,67 @@ plugins:
     path: ./data.db
 ```
 
-### 方式二：生产部署
-
-#### 1. 构建插件
-
-```bash
-npm run build
-```
-
-#### 2. 发布到 npm（可选）
-
-```bash
-npm publish
-```
-
-#### 3. 在 Koishi 中安装
-
-```bash
-# 在 Koishi 实例目录下
-npm install koishi-plugin-xiuxian
-```
-
-或直接在 Koishi 控制台的插件市场中搜索安装。
-
-## 使用说明
-
-### 命令列表
-
-| 命令 | 别名 | 说明 |
-|------|------|------|
-| `.步入仙途` | `步入仙途` | 创建角色，角色名为你的 QQ 昵称 |
-| `.天道记录` | `天道记录` | 查看你的修仙信息 |
-
-### 使用示例
+## 使用示例
 
 ```
-用户: .步入仙途
-Bot: @用户 恭喜你踏入修仙世界！
+用户: 步入仙途
+Bot: @用户 恭喜你踏入修��世界！
      ✨ 你的仙途由此开启 ✨
      道号：张三
-     愿你在这修仙世界中破开虚妄，证得大道！
-     💡 使用 .天道记录 查看你的信息
+     灵根资质：75
+     ⭐ 优秀灵根，修炼速度将远超常人
+     ...
 
-用户: .天道记录
+用户: 打坐 2
+Bot: @用户 你开始盘膝打坐，进入修炼状态...
+     修炼时长：2小时
+     预计收益：94修为
+     2小时后再次使用本命令结算收益
+
+用户: 天道记录
 Bot: @用户
      ━━━━ 天道记录 ━━━━
      👤 道号：张三
-     📅 入门时间：2025/11/18 21:30:00
+     ⭐ 境界：练气期初期
+     📊 修为：94/250
+     💎 灵石：100
+     🌟 灵根：75
+     ⚔️ 战力：750
+     📅 入门时间：2025/11/19 10:30:00
      ━━━━━━━━━━━━━━
+
+用户: .���破
+Bot: @用户 🎉 突破成功！恭喜你踏入 练气期中期 境界！
+     你感觉到体内灵力澎湃，实力大增！
 ```
 
 ## 技术架构
 
 ```
-koishi-plugin-xiuxian/
+koishi-plugin-xiuxian-txl/
 ├── src/
-│   ├── index.ts       # 主插件文件（命令注册）
-│   └── database.ts    # 数据库表定义
-├── lib/               # 编译输出目录
+│   ├── index.ts                 # 主入口
+│   ├── config/                  # 配置
+│   │   ├── constants.ts         # 游戏常量（境界、参数等）
+│   │   └── messages.ts          # 消息文案
+│   ├── database/                # 数据库
+│   │   ├── index.ts             # 数据��初始化
+│   │   └── models/player.ts     # 玩家模型
+│   ├── services/                # 业务逻辑
+│   │   └── player.service.ts    # 玩家服务
+│   ├── commands/                # 命令
+│   │   ├── index.ts             # 命令注册
+│   │   ├── player.ts            # 玩家命令
+│   │   └── cultivation.ts       # 修炼命令
+│   ├── utils/                   # 工具
+│   │   ├── calculator.ts        # 计算函数
+│   │   ├── formatter.ts         # 格式化
+│   │   └── random.ts            # 随机数
+│   └── types/                   # 类型定义
+│       └── player.ts            # 玩家类型
+├── lib/                         # 编译输出
 ├── package.json
-├── tsconfig.json
-└── README.md
+└── tsconfig.json
 ```
 
 ### 数据库表结构
@@ -132,90 +130,80 @@ koishi-plugin-xiuxian/
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| id | unsigned (自增) | 主键 |
-| userId | string (唯一) | QQ用户ID |
-| username | string | 玩家名字（QQ昵称） |
+| id | unsigned | 主键���自增） |
+| userId | string | QQ用户ID（唯一） |
+| username | string | 道号 |
+| realm | unsigned | 大境界（0-8） |
+| realmLevel | unsigned | 小境界（0-3） |
+| cultivation | unsigned | 当前修为 |
+| cultivationMax | unsigned | 突破所需修为 |
+| spiritStone | unsigned | 灵石 |
+| spiritualRoot | unsigned | 灵根（1-100） |
+| combatPower | unsigned | 战力 |
+| status | string | 状态 |
+| statusEndTime | timestamp | 状态结束时间 |
 | createTime | timestamp | 创建时间 |
 
 ## 开发指南
 
 ### 添加新命令
 
-在 `src/index.ts` 中添加：
+1. 在 `src/commands/` 下创建新的命令文件
+2. 在 `src/commands/index.ts` 中导入并注册
 
 ```typescript
-ctx.command('你的命令名', '命令描述')
-  .alias('.你的命令名')
-  .action(async ({ session }) => {
-    // 你的逻辑
-  })
-```
-
-### 扩展数据库表
-
-1. 在 `src/database.ts` 中修改 `Player` 接口
-2. 在 `initDatabase` 函数中添加新字段
-
-```typescript
-export interface Player {
-  // ... 现有字段
-  level: number          // 新增字段：等级
-  exp: number           // 新增字段：经验值
+// src/commands/combat.ts
+export function registerCombatCommands(ctx: Context, playerService: PlayerService) {
+  ctx.command('历练', '外出历练打怪')
+    .action(async ({ session }) => {
+      // 你的逻辑
+    })
 }
-
-ctx.model.extend('xiuxian_player', {
-  // ... 现有字段
-  level: 'unsigned',
-  exp: 'unsigned',
-})
 ```
 
-### 调试
+### 添加新服务
 
-开启 Koishi 的调试模式：
-
-```bash
-# 在 Koishi 实例目录下
-koishi start --log-level debug
-```
-
-查看插件日志：
+在 `src/services/` 下创建新的服务类：
 
 ```typescript
-ctx.logger('xiuxian').info('你的日志信息')
+// src/services/combat.service.ts
+export class CombatService {
+  constructor(private ctx: Context) {}
+
+  async fight(attackerId: string, defenderId: string) {
+    // 战斗逻辑
+  }
+}
+```
+
+### 修改游戏参数
+
+编辑 `src/config/constants.ts`：
+
+```typescript
+export const GameConfig = {
+  CULTIVATION_BASE_SPEED: 10,  // 修炼速度
+  BREAKTHROUGH_BASE_RATE: 0.5, // 突破成功率
+  // ...
+}
 ```
 
 ## 后续计划
 
-### 阶段二：游戏内容扩充
-- 境界系统（练气、筑基、金丹...）
-- 修炼系统（打坐、闭关、突破）
-- 简单战斗（打怪、PVP）
+### 阶段二：战斗与物品
+- 战斗系统（简单战力对比）
+- 物品系统（背包、商店）
+- 灵石获取途径
 
-### 阶段三：AI 知识库集成
-- 游戏命令索引
-- 智能命令推荐
-- 新手引导
+### 阶段三：AI知识库
+- 命令知识库构建
+- 简单关键词匹配
+- `.帮助` 智能搜索
 
-### 阶段四：深度 AI 辅助
+### 阶段四：深度AI集成
+- 与 ChatLuna 集成
 - 意图识别
-- 上下文记忆
-- 主动提醒
-
-## 常见问题
-
-### Q: 插件启动后找不到命令？
-A: 检查 Koishi 控制台中插件是否启用，确保数据库服务已加载。
-
-### Q: 数据库表没有自动创建？
-A: 重启 Koishi 或使用 `ctx.database.drop()` 后重新创建表。
-
-### Q: 如何重置玩家数据？
-A: 使用数据库管理工具删除 `xiuxian_player` 表的对应记录。
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+- 个性化推荐
 
 ## 许可证
 
