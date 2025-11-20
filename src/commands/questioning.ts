@@ -219,11 +219,12 @@ export function registerQuestioningCommands(
         const pathPackageService = questioningService.getPathPackageService()
         const pkg = pathPackageService.getById(questionSession.pathId)
 
-        if (pkg) {
-          // 使用问道包处理逻辑
+        // ✨ 关键修复：排除 INITIATION 包，让它走注册流程
+        if (pkg && !pkg.tags.includes('initiation')) {
+          // 使用问道包处理逻辑（仅用于非注册包）
           result = await questioningService.submitPackageAnswer(session.userId, answer)
         } else {
-          // 使用传统问心逻辑
+          // 使用传统问心逻辑（包括步入仙途注册流程）
           result = await questioningService.submitAnswer(session.userId, answer)
         }
       } else {

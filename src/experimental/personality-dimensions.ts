@@ -1,7 +1,46 @@
 /**
- * 扩展性格维度系统
+ * ============================================================
+ * 性格量化系统 v2.0 - 22维性格维度定义（实验性功能）
+ * ============================================================
  *
- * 从9维扩展到22维，更细致地刻画修士性格
+ * 当前状态: 未启用（默认使用 v1.0 的 9 维系统）
+ * 系统版本: v2.0 - 22维扩展性格系统
+ *
+ * 本文件定义了 v2.0 系统的 22 个性格维度，从 v1.0 的 9 维扩展而来。
+ *
+ * v2.0 性格维度分类:
+ * - 核心特质 (10个): determination, courage, patience, wisdom, compassion,
+ *                     ambition, loyalty, creativity, discipline, adaptability
+ * - 道德倾向 (6个): righteousness, selflessness, pragmatism,
+ *                   ruthlessness, greed, manipulation
+ * - 修炼风格 (6个): combat_oriented, cultivation_focused, social_oriented,
+ *                   knowledge_seeking, power_seeking, balance_seeking
+ *
+ * v1.0 vs v2.0 对比:
+ * - v1.0: 9 维固定评分 + 关键词匹配
+ * - v2.0: 22 维 AI 智能解析 + 多问道包系统
+ *
+ * v2.0 系统相关文件:
+ * - src/experimental/personality-dimensions.ts（本文件）- 22维定义
+ * - src/experimental/path-packages.ts - 多问道包配置
+ * - src/config/personality-system-config.ts - 版本切换
+ * - src/experimental/ai-personality-analyzer.ts - AI解析器
+ * - src/experimental/extended-fate-calculator.ts - 扩展天命计算器
+ *
+ * 启用方法:
+ * 在 src/index.ts 的 Config 中设置:
+ *   personalitySystemVersion: 'v2.0'
+ *
+ * 注意事项:
+ * - v2.0 系统未经过充分测试
+ * - 所有题目都需要 AI 评估，成本较高
+ * - 与 v1.0 数据结构不完全兼容
+ *
+ * 参考文档:
+ * - .claude/性格量化系统v2升级方案.md
+ * - .claude/性格量化解析详解.md
+ *
+ * ============================================================
  */
 
 /**

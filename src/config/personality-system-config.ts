@@ -1,9 +1,38 @@
 /**
- * 性格量化系统版本配置
+ * ============================================================
+ * 性格量化系统 v2.0 - 版本切换配置
+ * ============================================================
  *
- * 支持 v1.0 和 v2.0 两个版本:
+ * 当前状态: 默认 v1.0（可在 src/index.ts 中切换到 v2.0）
+ *
+ * 本文件负责管理 v1.0 和 v2.0 两个性格系统版本的切换。
+ *
+ * 版本对比:
  * - v1.0: 9维性格系统 + 固定选项加分 + 关键词匹配
  * - v2.0: 22维性格系统 + AI智能解析 + 多问道包
+ *
+ * 切换方法:
+ * 在 src/index.ts 的 Config 中设置:
+ *   personalitySystemVersion: 'v2.0'  // 切换到 v2.0
+ *   enableMultiplePaths: true         // 启用多问道包
+ *   fallbackToV1: true                // AI 失败时降级到 v1.0
+ *
+ * v2.0 系统相关文件:
+ * - src/config/personality-system-config.ts（本文件）- 版本切换
+ * - src/experimental/personality-dimensions.ts - 22维定义
+ * - src/experimental/path-packages.ts - 多问道包配置
+ * - src/experimental/ai-personality-analyzer.ts - AI解析器
+ * - src/experimental/extended-fate-calculator.ts - 扩展天命计算器
+ *
+ * 注意事项:
+ * - v2.0 系统未经过充分测试
+ * - 需要更多 AI 调用，成本较高
+ * - 建议在测试环境中启用
+ *
+ * 参考文档:
+ * - .claude/性格量化系统v2升级方案.md
+ *
+ * ============================================================
  */
 
 /**

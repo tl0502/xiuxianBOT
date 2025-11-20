@@ -1,7 +1,48 @@
 /**
- * 扩展版天命计算器
+ * ============================================================
+ * 性格量化系统 v2.0 - 扩展天命计算器（实验性功能）
+ * ============================================================
  *
- * 支持22维性格系统和多问道包
+ * 当前状态: 未启用（仅在 v2.0 模式下调用）
+ * 系统版本: v2.0 - 支持 22 维性格系统和多问道包
+ *
+ * 本文件是 FateCalculator 的扩展版本，支持：
+ * - 22 维性格系统的灵根分配
+ * - 多问道包的维度权重
+ * - 与 v1.0 相同的三层控制机制
+ *
+ * 与 v1.0 的区别:
+ * - v1.0: fate-calculator.ts - 9 维性格 + 固定权重
+ * - v2.0: extended-fate-calculator.ts（本文件）- 22 维 + 动态权重
+ *
+ * 三层控制机制（与 v1.0 相同）:
+ * 1. 基础概率（fate-distribution.ts）
+ * 2. 性格加权（根据 22 维分数调整）
+ * 3. 统计平衡（initial-root-stats 表）
+ *
+ * v2.0 系统相关文件:
+ * - src/experimental/extended-fate-calculator.ts（本文件）- 扩展天命计算器
+ * - src/experimental/personality-dimensions.ts - 22维定义
+ * - src/experimental/path-packages.ts - 多问道包配置
+ * - src/config/personality-system-config.ts - 版本切换
+ * - src/experimental/ai-personality-analyzer.ts - AI解析器
+ *
+ * 调用位置:
+ * - src/utils/ai-helper.ts:9 - generateInitiationResponseV2()
+ *
+ * 启用方法:
+ * 在 src/index.ts 的 Config 中设置:
+ *   personalitySystemVersion: 'v2.0'
+ *
+ * 注意事项:
+ * - 公平性保证机制与 v1.0 完全相同
+ * - 22 维性格到灵根的映射规则需要调优
+ * - 统计平衡功能可确保长期公平性
+ *
+ * 参考文档:
+ * - .claude/性格量化系统v2升级方案.md
+ *
+ * ============================================================
  */
 
 import { Context } from 'koishi'
@@ -12,9 +53,9 @@ import {
   STATISTICAL_BALANCE_THRESHOLD,
   getEnabledGrades
 } from '../config/fate-distribution'
-import { ExtendedPersonalityScore } from '../config/personality-dimensions'
+import { ExtendedPersonalityScore } from './personality-dimensions'
 import { RootStatsService } from '../services/root-stats.service'
-import { PathPackageDefinition } from '../config/path-packages'
+import { PathPackageDefinition } from './path-packages'
 
 /**
  * 概率分布类型（灵根 -> 概率）

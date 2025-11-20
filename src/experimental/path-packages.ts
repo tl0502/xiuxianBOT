@@ -1,7 +1,35 @@
 /**
- * 多问道包系统配置
+ * ============================================================
+ * 性格量化系统 v2.0 - 多问道包配置（实验性功能）
+ * ============================================================
  *
- * 支持不同类型的问心路径，每个路径有不同的侧重点
+ * 当前状态: 未启用（默认使用 v1.0）
+ * 系统版本: v2.0 - 22维性格系统 + 多问道包
+ *
+ * 本文件属于 v2.0 实验性功能，暂时搁置，尚未集成到主流程。
+ *
+ * v2.0 系统相关文件:
+ * - src/experimental/path-packages.ts（本文件）- 多问道包定义
+ * - src/experimental/personality-dimensions.ts - 22维性格系统
+ * - src/config/personality-system-config.ts - 版本切换配置
+ * - src/experimental/ai-personality-analyzer.ts - AI性格解析器
+ * - src/experimental/extended-fate-calculator.ts - 扩展天命计算器
+ *
+ * 启用方法:
+ * 在 src/index.ts 的 Config 中设置:
+ *   personalitySystemVersion: 'v2.0'
+ *
+ * 注意事项:
+ * - v2.0 系统未经过充分测试
+ * - 需要更多 AI 调用，成本较高
+ * - 数据结构与 v1.0 不完全兼容
+ * - 建议在测试环境中启用
+ *
+ * 参考文档:
+ * - .claude/性格量化系统v2升级方案.md
+ * - .claude/PROJECT_MEMORY.md（第1358-1438行）
+ *
+ * ============================================================
  */
 
 /**

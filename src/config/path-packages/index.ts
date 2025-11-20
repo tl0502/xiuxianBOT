@@ -4,6 +4,8 @@
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
+import { initiationPackages } from './initiation'
+import { trialPackages } from './trial'
 import { opportunityPackages } from './opportunity'
 import { enlightenmentPackages } from './enlightenment'
 import { demonPackages } from './demon'
@@ -12,9 +14,11 @@ import { bondPackages } from './bond'
 import { desirePackages } from './desire'
 
 /**
- * 所有示例问道包
+ * 所有问道包
  */
 export const ALL_PATH_PACKAGES: PathPackageTemplate[] = [
+  ...initiationPackages,   // 步入仙途（新玩家专用）
+  ...trialPackages,        // 试炼问心（心境磨练）
   ...opportunityPackages,
   ...enlightenmentPackages,
   ...demonPackages,
@@ -27,6 +31,8 @@ export const ALL_PATH_PACKAGES: PathPackageTemplate[] = [
  * 按Tag分类导出
  */
 export {
+  initiationPackages,
+  trialPackages,
   opportunityPackages,
   enlightenmentPackages,
   demonPackages,

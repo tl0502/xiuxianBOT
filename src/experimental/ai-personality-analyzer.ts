@@ -1,12 +1,51 @@
 /**
- * AI 性格解析系统
+ * ============================================================
+ * 性格量化系统 v2.0 - AI 性格解析器（实验性功能）
+ * ============================================================
  *
- * 使用 AI 理解用户回答并量化性格特征
- * 提供严格的打分标准以限制 AI 偏向性
+ * 当前状态: 未启用（仅在 v2.0 模式下调用）
+ * 系统版本: v2.0 - AI 智能解析 22 维性格
+ *
+ * 本文件实现了基于 AI 的性格分析功能，使用 ChatLuna 评估用户回答
+ * 并生成 22 维性格分数。
+ *
+ * 核心功能:
+ * - analyzePersonality(): 使用 AI 分析用户回答，生成 22 维评分
+ * - buildScoringPrompt(): 构建包含 22 维度说明和打分标准的 Prompt
+ * - validateAndNormalize(): 验证 AI 响应，归一化到 0-10 范围
+ * - getFallbackScore(): 降级方案（关键词匹配）
+ *
+ * 与 v1.0 的区别:
+ * - v1.0: personality-analyzer.ts - 9维 + 固定选项加分
+ * - v2.0: ai-personality-analyzer.ts（本文件）- 22维 + AI智能解析
+ *
+ * v2.0 系统相关文件:
+ * - src/experimental/ai-personality-analyzer.ts（本文件）- AI解析器
+ * - src/experimental/personality-dimensions.ts - 22维定义
+ * - src/experimental/path-packages.ts - 多问道包配置
+ * - src/config/personality-system-config.ts - 版本切换
+ * - src/experimental/extended-fate-calculator.ts - 扩展天命计算器
+ *
+ * 调用位置:
+ * - src/utils/ai-helper.ts:8 - generateInitiationResponseV2()
+ *
+ * 启用方法:
+ * 在 src/index.ts 的 Config 中设置:
+ *   personalitySystemVersion: 'v2.0'
+ *
+ * 注意事项:
+ * - 每次问心需要调用一次 AI（成本较高）
+ * - AI 响应可能不稳定，需要验证和归一化
+ * - 降级模式使用简单的关键词匹配
+ *
+ * 参考文档:
+ * - .claude/性格量化系统v2升级方案.md
+ *
+ * ============================================================
  */
 
 import { Context } from 'koishi'
-import { ExtendedPersonalityScore, PERSONALITY_DIMENSIONS, PersonalityCategory, createEmptyExtendedScore, getAllDimensionKeys } from '../config/personality-dimensions'
+import { ExtendedPersonalityScore, PERSONALITY_DIMENSIONS, PersonalityCategory, createEmptyExtendedScore, getAllDimensionKeys } from './personality-dimensions'
 
 /**
  * AI 性格解析器

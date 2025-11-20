@@ -1,13 +1,13 @@
 import { Context } from 'koishi'
-import { InitiationAIResponse, TrialAIResponse } from '../config/questioning'
+import { InitiationAIResponse, TrialAIResponse } from '../types/ai-response'
 import { Player } from '../types/player'
 import { SpiritualRootType, SPIRITUAL_ROOTS } from '../config/spiritual-roots'
 import { FateCalculator } from './fate-calculator'
 import { analyzePersonality, getPersonalityDescription } from './personality-analyzer'
 import { isUsingV2, getPersonalitySystemConfig } from '../config/personality-system-config'
-import { AIPersonalityAnalyzer } from './ai-personality-analyzer'
-import { ExtendedFateCalculator } from './extended-fate-calculator'
-import { getRandomInitiationPath } from '../config/path-packages'
+import { AIPersonalityAnalyzer } from '../experimental/ai-personality-analyzer'
+import { ExtendedFateCalculator } from '../experimental/extended-fate-calculator'
+import { getRandomInitiationPath } from '../experimental/path-packages'
 
 /**
  * AI 辅助工具类

@@ -1,11 +1,10 @@
 import { Context } from 'koishi'
 import * as fs from 'fs'
 import * as path from 'path'
-import { ALL_PATHS, QuestioningPath, PathPackageType, getRandomPath } from '../config/questioning'
+import { QuestioningPath, PathPackageType, getRandomPath, getPathById as getPathByIdFromConfig, getPathsByPackageType } from '../config/questioning'
 import {
   QuestioningSession,
   ServiceResult,
-  QuestioningStartData,
   InitiationStartData,
   AnswerSubmitData,
   InitiationCompleteData,
@@ -111,11 +110,8 @@ export class QuestioningService {
    * 获取所有可用的问心路径
    */
   getAvailablePaths(player: Player): QuestioningPath[] {
-    return ALL_PATHS.filter(path => {
-      // 过滤掉步入仙途路径（那是创角专用的）
-      if (path.packageType === PathPackageType.INITIATION) {
-        return false
-      }
+    const trialPaths = getPathsByPackageType(PathPackageType.TRIAL)
+    return trialPaths.filter(path => {
       // 检查境界要求
       if (path.minRealm !== undefined && player.realm < path.minRealm) {
         return false
@@ -128,7 +124,7 @@ export class QuestioningService {
    * 根据 ID 获取路径
    */
   getPathById(pathId: string): QuestioningPath | null {
-    return ALL_PATHS.find(p => p.id === pathId) || null
+    return getPathByIdFromConfig(pathId)
   }
 
   /**
@@ -171,62 +167,7 @@ export class QuestioningService {
   }
 
   /**
-   * 开始问心
-   */
-  async startQuestioning(userId: string, pathId: string, player: Player): Promise<ServiceResult<QuestioningStartData>> {
-    // 检查路径是否存在
-    const path = this.getPathById(pathId)
-    if (!path) {
-      return { success: false, message: '问心路径不存在' }
-    }
-
-    // 检查境界要求
-    if (path.minRealm !== undefined && player.realm < path.minRealm) {
-      return {
-        success: false,
-        message: `需要达到 ${getRealmName(path.minRealm, 0)} 才能进行此问心`
-      }
-    }
-
-    // 检查冷却
-    const cooldownResult = await this.checkCooldown(userId, pathId)
-    if (!cooldownResult.success) {
-      return { success: false, message: cooldownResult.message }
-    }
-
-    // 检查是否已有进行中的问心
-    if (this.sessions.has(userId)) {
-      return { success: false, message: '你正在进行问心，请先完成或取消' }
-    }
-
-    // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
-    const session: QuestioningSession = {
-      userId,
-      pathId,
-      currentStep: 1,
-      answers: [],
-      startTime: new Date(),
-      lastQuestionTime: new Date(),
-      timeoutSeconds: this.getDefaultTimeoutSeconds()
-    }
-    this.sessions.set(userId, session)
-
-    // 返回第一题
-    const firstQuestion = path.questions[0]
-    return {
-      success: true,
-      message: '问心开始',
-      data: {
-        question: firstQuestion.question,
-        options: firstQuestion.options?.map(o => o.text),
-        timeoutSeconds: session.timeoutSeconds,
-        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
-      }
-    }
-  }
-
-  /**
-   * 提交答案
+   * 提交答案（传统问心逻辑，现仅用于步入仙途注册流程）
    */
   async submitAnswer(userId: string, answer: string): Promise<ServiceResult<AnswerSubmitData>> {
     const session = this.sessions.get(userId)
@@ -328,12 +269,16 @@ export class QuestioningService {
       session.isCompleting = true
       this.sessions.set(userId, session)
 
-      // 完成问心，根据路径类型选择不同的处理方式
-      if (path.packageType === PathPackageType.INITIATION) {
-        return await this.completeInitiationQuestioning(userId, session, path)
-      } else {
-        return await this.completeQuestioning(userId, session, path)
+      // ✨ submitAnswer现在仅用于步入仙途注册流程
+      // 如果pathId不是INITIATION类型，说明路由错误
+      if (path.packageType !== PathPackageType.INITIATION) {
+        this.ctx.logger('xiuxian').error(`路由错误：非INITIATION包${path.id}错误进入submitAnswer，应走submitPackageAnswer`)
+        this.sessions.delete(userId)
+        return { success: false, message: '系统错误：路径类型不匹配' }
       }
+
+      // 完成步入仙途注册流程
+      return await this.completeInitiationQuestioning(userId, session, path)
     }
 
     // 进入下一题
@@ -354,78 +299,6 @@ export class QuestioningService {
         timeoutSeconds: timeoutForNext,
         timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`
       }
-    }
-  }
-
-  /**
-   * 完成问心并进行 AI 评估
-   */
-  private async completeQuestioning(
-    userId: string,
-    session: QuestioningSession,
-    path: QuestioningPath
-  ): Promise<ServiceResult<AnswerSubmitData>> {
-    try {
-      // 获取玩家信息
-      const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
-      if (!player) {
-        this.sessions.delete(userId)
-        return { success: false, message: '玩家信息不存在' }
-      }
-
-      // 调用 AI 评估（传递完整的答案文本）
-      const questions = path.questions.map(q => q.question)
-      const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.text))
-      const aiResponse = await this.aiHelper.generateQuestioningResponse(
-        path.name,
-        path.description,
-        questions,
-        answersText,
-        player
-      )
-
-      // 保存记录到数据库
-      await this.ctx.database.create('xiuxian_questioning_v3', {
-        userId,
-        pathId: path.id,
-        pathName: path.name,
-        answer1: answersText[0] || '',
-        answer2: answersText[1] || '',
-        answer3: answersText[2] || '',
-        aiResponse: JSON.stringify(aiResponse),
-        personality: aiResponse.personality,
-        tendency: aiResponse.tendency,
-        rewardType: aiResponse.reward.type,
-        rewardValue: aiResponse.reward.value,
-        rewardReason: aiResponse.reason,
-        createTime: new Date()
-      })
-
-      // 应用奖励
-      await this.applyReward(userId, aiResponse.reward.type, aiResponse.reward.value)
-
-      // 清除会话
-      this.sessions.delete(userId)
-
-      // 返回结果
-      return {
-        success: true,
-        message: '问心完成',
-        data: {
-          personality: aiResponse.personality,
-          tendency: aiResponse.tendency,
-          reward: {
-            type: aiResponse.reward.type,
-            value: aiResponse.reward.value,
-            description: this.getRewardDescription(aiResponse.reward.type, aiResponse.reward.value)
-          },
-          reason: aiResponse.reason
-        }
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('问心完成流程错误:', error)
-      this.sessions.delete(userId)
-      return { success: false, message: '问心评估失败，请稍后重试' }
     }
   }
 
