@@ -21,7 +21,8 @@ export interface Player {
   spiritStone: number           // 灵石
 
   // 属性
-  spiritualRoot: string         // 灵根类型（SpiritualRootType）
+  spiritualRoot: string         // 当前灵根类型（可升级）
+  initialSpiritualRoot: string  // 初始灵根（不可变，用于统计）
   combatPower: number           // 战力
 
   // 状态

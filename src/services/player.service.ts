@@ -53,7 +53,8 @@ export class PlayerService {
       player = await this.ctx.database.create('xiuxian_player_v3', {
         userId: input.userId,
         username: input.username,  // AI 分配的道号
-        spiritualRoot: input.spiritualRoot,  // AI 分配的灵根
+        spiritualRoot: input.spiritualRoot,  // 当前灵根（可升级）
+        initialSpiritualRoot: input.spiritualRoot,  // 初始灵根（不可变，用于统计）
         realm: GameConfig.INITIAL_REALM,
         realmLevel: GameConfig.INITIAL_REALM_LEVEL,
         cultivation: GameConfig.INITIAL_CULTIVATION,

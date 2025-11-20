@@ -4,6 +4,7 @@ import { QuestioningService } from '../services/questioning.service'
 import { registerPlayerCommands } from './player'
 import { registerCultivationCommands } from './cultivation'
 import { registerQuestioningCommands } from './questioning'
+import { registerPackageTestCommands } from './package-test'
 
 /**
  * 注册所有命令
@@ -17,4 +18,5 @@ export function registerCommands(ctx: Context) {
   registerPlayerCommands(ctx, playerService, questioningService)
   registerCultivationCommands(ctx, playerService)
   registerQuestioningCommands(ctx, playerService, questioningService)
+  registerPackageTestCommands(ctx, playerService, questioningService)
 }

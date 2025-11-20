@@ -3,6 +3,7 @@ import { QuestioningService } from '../services/questioning.service'
 import { PlayerService } from '../services/player.service'
 import { atMessage } from '../utils/formatter'
 import { getRealmName, getSpiritualRootInfo } from '../utils/calculator'
+import { AnswerSubmitData } from '../types/questioning'
 
 /**
  * 注册问心相关命令
@@ -209,7 +210,26 @@ export function registerQuestioningCommands(
     if (!answer) return
 
     try {
-      const result = await questioningService.submitAnswer(session.userId, answer)
+      // 获取会话信息，判断是否是问道包
+      const questionSession = questioningService.getSession(session.userId)
+      let result
+
+      if (questionSession) {
+        // 检查是否是问道包（通过pathId判断）
+        const pathPackageService = questioningService.getPathPackageService()
+        const pkg = pathPackageService.getById(questionSession.pathId)
+
+        if (pkg) {
+          // 使用问道包处理逻辑
+          result = await questioningService.submitPackageAnswer(session.userId, answer)
+        } else {
+          // 使用传统问心逻辑
+          result = await questioningService.submitAnswer(session.userId, answer)
+        }
+      } else {
+        // 没有会话，使用传统逻辑
+        result = await questioningService.submitAnswer(session.userId, answer)
+      }
 
       if (!result.success) {
         return h('', [
@@ -218,12 +238,13 @@ export function registerQuestioningCommands(
       }
 
       // 如果还有下一题（检查是否有 step 字段）
-      if (result.data && result.data.step) {
-        let message = `\n\n📝 问题 ${result.data.step}/3：\n`
-        message += `${result.data.question}\n\n`
+      if (result.data && 'step' in result.data) {
+        const data = result.data as AnswerSubmitData
+        let message = `\n\n📝 问题 ${data.step}/3：\n`
+        message += `${data.question}\n\n`
 
-        if (result.data.options) {
-          result.data.options.forEach((opt: string, i: number) => {
+        if (data.options) {
+          data.options.forEach((opt, i) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
           message += `\n请回复选项字母（如：A）`
@@ -232,8 +253,8 @@ export function registerQuestioningCommands(
         }
 
         // 附加倒计时提示（如果存在）
-        if (result.data.timeoutMessage) {
-          message += `\n\n${result.data.timeoutMessage}`
+        if (data.timeoutMessage) {
+          message += `\n\n${data.timeoutMessage}`
         }
 
         return h('', [
@@ -242,10 +263,51 @@ export function registerQuestioningCommands(
         ])
       }
 
+      // 问道包完成（新增）
+      if (result.data && 'packageId' in result.data) {
+        const data = result.data as any
+        let message = '\n\n━━━━ 问道完成 ━━━━\n\n'
+        message += `📦 ${data.packageName}\n\n`
+
+        // 显示匹配结果
+        if (data.matchResult) {
+          const mr = data.matchResult
+          const tierName = mr.tier === 'perfect' ? '完美契合' : mr.tier === 'good' ? '良好匹配' : '普通匹配'
+          message += `🎯 匹配度：${mr.matchRate.toFixed(1)}%\n`
+          message += `✨ 等级：${tierName}\n\n`
+        }
+
+        // AI评语
+        if (data.aiResponse) {
+          message += `💬 天道评语：\n${data.aiResponse.evaluation}\n\n`
+        }
+
+        // 奖励
+        if (data.rewards && data.rewards.length > 0) {
+          message += `🎁 获得奖励：\n`
+          data.rewards.forEach((r: any) => {
+            message += `   ${r.description}\n`
+          })
+          message += '\n'
+        }
+
+        // 奖励原因
+        if (data.aiResponse?.rewardReason) {
+          message += `💭 ${data.aiResponse.rewardReason}\n\n`
+        }
+
+        message += `━━━━━━━━━━━━━━`
+
+        return h('', [
+          h('at', { id: session.userId }),
+          h('text', { content: message })
+        ])
+      }
+
       // 问心完成 - 检查是否有完成数据
-      if (result.data && result.data.player) {
+      if (result.data && 'player' in result.data) {
         // 步入仙途完成
-        const data = result.data
+        const data = result.data as any
         const spiritualRootInfo = getSpiritualRootInfo(data.player.spiritualRoot)
 
         let message = '\n\n━━━━ 踏入仙途 ━━━━\n\n'
@@ -267,8 +329,8 @@ export function registerQuestioningCommands(
       }
 
       // 试炼问心完成
-      if (result.data && result.data.tendency && result.data.reward) {
-        const data = result.data
+      if (result.data && 'tendency' in result.data && 'reward' in result.data) {
+        const data = result.data as any
         let message = '\n\n━━━━ 问心完成 ━━━━\n\n'
         message += `✨ ${data.personality}\n\n`
         message += `🎭 问心倾向：${data.tendency}\n\n`

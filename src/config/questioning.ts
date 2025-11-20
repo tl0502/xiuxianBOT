@@ -21,7 +21,10 @@ export interface Question {
   id: string
   type: 'choice' | 'text'
   question: string
-  options?: QuestionOption[]
+  options?: QuestionOption[]  // 选择题的选项（数量可变，支持2-10个选项）
+
+  // ✨ v0.6.0 新增：AI评分提示
+  aiHint?: string  // 告诉AI这题想考察什么（仅用于开放题）
 }
 
 export interface QuestioningPath {

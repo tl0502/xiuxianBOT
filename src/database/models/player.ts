@@ -30,7 +30,8 @@ export function initPlayerModel(ctx: Context) {
     spiritStone: { type: 'unsigned', initial: GameConfig.INITIAL_SPIRIT_STONE },
 
     // 属性
-    spiritualRoot: { type: 'string', initial: SpiritualRootType.PSEUDO }, // 灵根类型
+    spiritualRoot: { type: 'string', initial: SpiritualRootType.PSEUDO }, // 当前灵根类型（可升级）
+    initialSpiritualRoot: { type: 'string', initial: SpiritualRootType.PSEUDO }, // 初始灵根（不可变，用于统计）
     combatPower: { type: 'unsigned', initial: 0 },
 
     // 状态

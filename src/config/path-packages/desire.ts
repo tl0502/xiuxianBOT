@@ -1,0 +1,269 @@
+/**
+ * 问道包 - 欲望试炼
+ * 面对权力、财富、美色的诱惑，考验自律与野心的平衡
+ */
+
+import { PathPackageTemplate } from '../../types/path-package'
+
+export const desirePackages: PathPackageTemplate[] = [
+  {
+    id: 'desire_power_temptation',
+    name: '权力诱惑',
+    description: '一个强大宗门向你抛出橄榄枝，许诺给你长老之位，但需要你做一些见不得光的事',
+    tags: ['desire', 'trial'],
+    triggerConditions: {
+      minRealm: 2,           // 练气期
+      cooldownHours: 96,     // 4天冷却
+      triggerChance: 0.12    // 12%触发率
+    },
+
+    // ✨ v0.6.0 启用AI评分
+    requiresAI: true,
+
+    // ✨ v0.6.0 AI评分配置
+    aiScoringConfig: {
+      openQuestionIndices: [2],  // 第3题是开放题
+      maxScorePerDimension: 8,
+      minScorePerDimension: -3
+    },
+
+    questions: [
+      {
+        id: 'q1',
+        type: 'choice',
+        question: '宗门长老私下找你，承诺让你成为核心弟子，但要你帮忙陷害一个竞争对手。你会？',
+        options: [
+          { text: 'A. 拒绝，不屑用这种手段', value: 'principled' },
+          { text: 'B. 假意答应，暗中调查', value: 'clever' },
+          { text: 'C. 询问详情，评估风险收益', value: 'calculating' },
+          { text: 'D. 欣然同意，机会难得', value: 'ambitious' }
+        ]
+      },
+      {
+        id: 'q2',
+        type: 'choice',
+        question: '你发现那个竞争对手其实是无辜的，只是挡了某些人的路。此时你会？',
+        options: [
+          { text: 'A. 揭穿阴谋，维护正义', value: 'righteous' },
+          { text: 'B. 暗中帮助对手，不暴露自己', value: 'secretive' },
+          { text: 'C. 保持中立，不参与任何一方', value: 'neutral' },
+          { text: 'D. 继续执行计划，弱肉强食', value: 'ruthless' }
+        ]
+      },
+      {
+        id: 'q3',
+        type: 'text',
+        question: '修仙之路，权力意味着资源和保护。你如何看待为了获取权力而妥协底线？你的底线在哪里？',
+        // ✨ v0.6.0 AI评分提示
+        aiHint: '评估修士对权力和原则的态度。识别是否坚持原则（honesty高、determination高）、为权力妥协（greed高、manipulation高）、道心坚定（stability高）还是模棱两可无底线（focus低、honesty低）。检测作弊行为。'
+      }
+    ],
+    optimalScore: {
+      target: {
+        determination: 8,
+        courage: 7,
+        stability: 8,
+        focus: 7,
+        honesty: 7,
+        kindness: 6,
+        greed: 3,           // 适度的欲望
+        impatience: 3,
+        manipulation: 3     // 不过度算计
+      },
+      rewards: {
+        perfect: {
+          type: 'special',
+          value: 3,
+          aiPromptHint: '明辨是非，权力在握却不为所惑'
+        },
+        good: {
+          type: 'spirit_stone',
+          value: 250,
+          aiPromptHint: '保持了原则，获得些许势力支持'
+        },
+        normal: {
+          type: 'cultivation',
+          value: -30,
+          aiPromptHint: '欲望蒙蔽了双眼，道心受损'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
+  },
+
+  {
+    id: 'desire_wealth_greed',
+    name: '财富迷局',
+    description: '你发现了一处隐秘宝库的线索，但获取它需要付出道德代价',
+    tags: ['desire'],
+    triggerConditions: {
+      minRealm: 1,
+      cooldownHours: 84,     // 3.5天冷却
+      triggerChance: 0.14    // 14%触发率
+    },
+
+    // ✨ v0.6.0 启用AI评分
+    requiresAI: true,
+
+    // ✨ v0.6.0 AI评分配置
+    aiScoringConfig: {
+      openQuestionIndices: [2],  // 第3题是开放题
+      maxScorePerDimension: 8,
+      minScorePerDimension: -3
+    },
+
+    questions: [
+      {
+        id: 'q1',
+        type: 'choice',
+        question: '你得知一处遗迹中有巨额宝藏，但那是一位前辈生前托付给他后人的遗产。你会？',
+        options: [
+          { text: 'A. 不动，这是别人的东西', value: 'honest' },
+          { text: 'B. 寻找那位后人，告知此事', value: 'helpful' },
+          { text: 'C. 先取一部分，留一部分给后人', value: 'compromise' },
+          { text: 'D. 全部拿走，先到先得', value: 'greedy' }
+        ]
+      },
+      {
+        id: 'q2',
+        type: 'choice',
+        question: '后来你发现，那位后人是个作恶多端的恶徒。你对宝藏的想法是？',
+        options: [
+          { text: 'A. 仍然归还，承诺是承诺', value: 'principled' },
+          { text: 'B. 代为保管，等他改过自新', value: 'conditional' },
+          { text: 'C. 将宝藏用于行善，不给恶人', value: 'pragmatic' },
+          { text: 'D. 既然如此，那就自己留着', value: 'opportunistic' }
+        ]
+      },
+      {
+        id: 'q3',
+        type: 'text',
+        question: '灵石、法宝、丹药...修仙需要大量资源。你认为修士在追求财富时应该遵循什么原则？君子爱财，取之有道，对你意味着什么？',
+        // ✨ v0.6.0 AI评分提示
+        aiHint: '评估修士对财富的态度和道德观。识别是否君子爱财取之有道（honesty高、greed低）、贪婪无度（greed高、kindness低）、真诚深入思考（honesty高、focus高）还是敷衍空谈（impatience高、focus低）。检测作弊行为。'
+      }
+    ],
+    optimalScore: {
+      target: {
+        determination: 7,
+        courage: 6,
+        stability: 7,
+        focus: 6,
+        honesty: 9,         // 重视诚信
+        kindness: 7,
+        greed: 3,           // 低贪念
+        impatience: 3,
+        manipulation: 2
+      },
+      rewards: {
+        perfect: {
+          type: 'spirit_stone',
+          value: 500,
+          aiPromptHint: '君子爱财取之有道，天道有感，降下财运'
+        },
+        good: {
+          type: 'spirit_stone',
+          value: 200,
+          aiPromptHint: '心性尚可，获得适当回报'
+        },
+        normal: {
+          type: 'spirit_stone',
+          value: 30,
+          aiPromptHint: '贪念难消，所得甚微'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
+  },
+
+  {
+    id: 'desire_beauty_charm',
+    name: '红粉骷髅',
+    description: '你遇到了一位绝世美人，她愿意与你双修，但似乎另有目的',
+    tags: ['desire', 'trial'],
+    triggerConditions: {
+      minRealm: 3,           // 筑基期
+      cooldownHours: 120,    // 5天冷却
+      triggerChance: 0.08    // 8%触发率
+    },
+
+    // ✨ v0.6.0 启用AI评分
+    requiresAI: true,
+
+    // ✨ v0.6.0 AI评分配置
+    aiScoringConfig: {
+      openQuestionIndices: [2],  // 第3题是开放题
+      maxScorePerDimension: 8,
+      minScorePerDimension: -3
+    },
+
+    questions: [
+      {
+        id: 'q1',
+        type: 'choice',
+        question: '一位神秘女修主动接近你，提出双修之约，可大幅提升修为。你的反应是？',
+        options: [
+          { text: 'A. 礼貌拒绝，专心修炼', value: 'focused' },
+          { text: 'B. 询问她的来历和目的', value: 'cautious' },
+          { text: 'C. 半信半疑，小心尝试', value: 'tempted' },
+          { text: 'D. 欣然接受，美色与修为兼得', value: 'charmed' }
+        ]
+      },
+      {
+        id: 'q2',
+        type: 'choice',
+        question: '你发现她是来盗取你身上某件宝物的。但你也发现她似乎是被人胁迫。你会？',
+        options: [
+          { text: 'A. 帮助她解决困境', value: 'compassionate' },
+          { text: 'B. 揭穿并驱逐，但不伤害她', value: 'firm' },
+          { text: 'C. 假装不知，暗中防范', value: 'strategic' },
+          { text: 'D. 将计就计，反过来利用她', value: 'manipulative' }
+        ]
+      },
+      {
+        id: 'q3',
+        type: 'text',
+        question: '情欲、美色，对修士既是试炼也是红尘陷阱。你如何看待修仙路上的情爱？是该斩断情丝，还是拥抱红尘？',
+        // ✨ v0.6.0 AI评分提示
+        aiHint: '评估修士对情爱的态度和道心稳定性。识别是否道心坚定（stability高、focus高）、沉迷美色（stability低、greed高）、真诚思考情爱（honesty高、kindness高）还是冷酷无情（kindness低、stability高）。检测作弊行为。'
+      }
+    ],
+    optimalScore: {
+      target: {
+        determination: 8,
+        courage: 6,
+        stability: 9,        // 高道心稳定
+        focus: 8,
+        honesty: 7,
+        kindness: 7,
+        greed: 2,
+        impatience: 2,
+        manipulation: 3
+      },
+      rewards: {
+        perfect: {
+          type: 'cultivation',
+          value: 100,
+          aiPromptHint: '色不迷人人自迷，道心坚定，境界提升'
+        },
+        good: {
+          type: 'cultivation',
+          value: 40,
+          aiPromptHint: '心有波澜但未迷失，略有长进'
+        },
+        normal: {
+          type: 'cultivation',
+          value: -50,
+          aiPromptHint: '沉迷美色，修为受损'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
+  }
+]

@@ -2,12 +2,27 @@ import { Context } from 'koishi'
 import * as fs from 'fs'
 import * as path from 'path'
 import { ALL_PATHS, QuestioningPath, PathPackageType, getRandomPath } from '../config/questioning'
-import { QuestioningSession, ServiceResult, QuestioningResult } from '../types/questioning'
+import {
+  QuestioningSession,
+  ServiceResult,
+  QuestioningStartData,
+  InitiationStartData,
+  AnswerSubmitData,
+  InitiationCompleteData,
+  CooldownCheckData,
+  QuestioningRecord
+} from '../types/questioning'
 import { Player } from '../types/player'
 import { AIHelper } from '../utils/ai-helper'
 import { getRealmName } from '../utils/calculator'
 import { PlayerService } from './player.service'
+import { RootStatsService } from './root-stats.service'
 import { SpiritualRootType } from '../config/spiritual-roots'
+import { PathPackageService } from './path-package.service'
+import { PathPackageTemplate, PathPackageTag, PackageExecutionResult, MatchResult } from '../types/path-package'
+import { calculateMatchResult, generateMatchDescription, generateSimilarityAnalysis } from '../utils/score-matcher'
+import { ALL_PATH_PACKAGES } from '../config/path-packages/index'
+import { HybridPersonalityAnalyzer } from '../utils/hybrid-personality-analyzer'
 
 /**
  * 问心服务类
@@ -16,10 +31,63 @@ export class QuestioningService {
   private sessions: Map<string, QuestioningSession> = new Map()
   private aiHelper: AIHelper
   private playerService: PlayerService
+  private rootStatsService: RootStatsService
+  private pathPackageService: PathPackageService
+  private hybridAnalyzer: HybridPersonalityAnalyzer
+  private cleanupInterval: NodeJS.Timeout
 
   constructor(private ctx: Context) {
     this.aiHelper = new AIHelper(ctx)
     this.playerService = new PlayerService(ctx)
+    this.rootStatsService = new RootStatsService(ctx)
+    this.pathPackageService = new PathPackageService(ctx)
+    this.hybridAnalyzer = new HybridPersonalityAnalyzer(ctx)
+
+    // 注册所有问道包
+    this.pathPackageService.registerAll(ALL_PATH_PACKAGES)
+    ctx.logger('xiuxian').info(`已注册 ${ALL_PATH_PACKAGES.length} 个问道包`)
+
+    // 启动定期清理任务（每5分钟清理一次过期session）
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSessions()
+    }, 5 * 60 * 1000)
+
+    ctx.logger('xiuxian').info('问心服务已启动，session自动清理已启用')
+  }
+
+  /**
+   * 清理过期的 session
+   */
+  private cleanupExpiredSessions(): void {
+    const now = Date.now()
+    let cleanedCount = 0
+
+    for (const [userId, session] of this.sessions) {
+      const lastTime = session.lastQuestionTime?.getTime() || session.startTime.getTime()
+      const timeout = (session.timeoutSeconds || this.getDefaultTimeoutSeconds()) * 1000
+
+      // 如果超时时间已过，清理该 session
+      if (now - lastTime > timeout) {
+        this.sessions.delete(userId)
+        cleanedCount++
+        this.ctx.logger('xiuxian').debug(`清理过期session: ${userId}`)
+      }
+    }
+
+    if (cleanedCount > 0) {
+      this.ctx.logger('xiuxian').info(`已清理 ${cleanedCount} 个过期session，当前活跃session数: ${this.sessions.size}`)
+    }
+  }
+
+  /**
+   * 释放资源（插件卸载时调用）
+   */
+  dispose(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval)
+      this.ctx.logger('xiuxian').info('问心服务已停止，session清理任务已取消')
+    }
+    this.sessions.clear()
   }
 
   // 获取默认超时（秒），从仓库根目录 src/config/timeout.json 读取；读取失败返回 60
@@ -66,7 +134,7 @@ export class QuestioningService {
   /**
    * 检查冷却时间
    */
-  async checkCooldown(userId: string, pathId: string): Promise<ServiceResult<{ canStart: boolean; remainingHours?: number }>> {
+  async checkCooldown(userId: string, pathId: string): Promise<ServiceResult<CooldownCheckData>> {
     const path = this.getPathById(pathId)
     if (!path || !path.cooldown) {
       return { success: true, message: '无冷却限制', data: { canStart: true } }
@@ -105,7 +173,7 @@ export class QuestioningService {
   /**
    * 开始问心
    */
-  async startQuestioning(userId: string, pathId: string, player: Player): Promise<ServiceResult<{ question: string; options?: string[]; timeoutSeconds?: number; timeoutMessage?: string }>> {
+  async startQuestioning(userId: string, pathId: string, player: Player): Promise<ServiceResult<QuestioningStartData>> {
     // 检查路径是否存在
     const path = this.getPathById(pathId)
     if (!path) {
@@ -123,7 +191,7 @@ export class QuestioningService {
     // 检查冷却
     const cooldownResult = await this.checkCooldown(userId, pathId)
     if (!cooldownResult.success) {
-      return cooldownResult as any
+      return { success: false, message: cooldownResult.message }
     }
 
     // 检查是否已有进行中的问心
@@ -160,10 +228,15 @@ export class QuestioningService {
   /**
    * 提交答案
    */
-  async submitAnswer(userId: string, answer: string): Promise<ServiceResult<any>> {
+  async submitAnswer(userId: string, answer: string): Promise<ServiceResult<AnswerSubmitData>> {
     const session = this.sessions.get(userId)
     if (!session) {
       return { success: false, message: '未找到问心会话，请先开始问心' }
+    }
+
+    // 检查是否正在完成中（防止并发重复完成）
+    if (session.isCompleting) {
+      return { success: false, message: '问心正在评估中，请稍候...' }
     }
 
     // 检查每题限时（会话级 timeoutSeconds 优先，未设置则读取默认 60 秒）
@@ -251,6 +324,10 @@ export class QuestioningService {
 
     // 检查是否完成所有问题
     if (session.currentStep >= 3) {
+      // 设置完成标志，防止并发重复完成
+      session.isCompleting = true
+      this.sessions.set(userId, session)
+
       // 完成问心，根据路径类型选择不同的处理方式
       if (path.packageType === PathPackageType.INITIATION) {
         return await this.completeInitiationQuestioning(userId, session, path)
@@ -287,7 +364,7 @@ export class QuestioningService {
     userId: string,
     session: QuestioningSession,
     path: QuestioningPath
-  ): Promise<ServiceResult<QuestioningResult>> {
+  ): Promise<ServiceResult<AnswerSubmitData>> {
     try {
       // 获取玩家信息
       const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
@@ -335,17 +412,14 @@ export class QuestioningService {
         success: true,
         message: '问心完成',
         data: {
-          success: true,
-          data: {
-            personality: aiResponse.personality,
-            tendency: aiResponse.tendency,
-            reward: {
-              type: aiResponse.reward.type,
-              value: aiResponse.reward.value,
-              description: this.getRewardDescription(aiResponse.reward.type, aiResponse.reward.value)
-            },
-            reason: aiResponse.reason
-          }
+          personality: aiResponse.personality,
+          tendency: aiResponse.tendency,
+          reward: {
+            type: aiResponse.reward.type,
+            value: aiResponse.reward.value,
+            description: this.getRewardDescription(aiResponse.reward.type, aiResponse.reward.value)
+          },
+          reason: aiResponse.reason
         }
       }
     } catch (error) {
@@ -432,7 +506,7 @@ export class QuestioningService {
   /**
    * 开始步入仙途问心（随机选择一条 INITIATION 路径）
    */
-  async startInitiationQuestioning(userId: string): Promise<ServiceResult<{ pathName: string; pathDescription: string; question: string; options?: string[]; timeoutSeconds?: number; timeoutMessage?: string }>> {
+  async startInitiationQuestioning(userId: string): Promise<ServiceResult<InitiationStartData>> {
     // 检查是否已有进行中的问心
     if (this.sessions.has(userId)) {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
@@ -475,7 +549,7 @@ export class QuestioningService {
   /**
    * 开始试炼问心（随机选择一条 TRIAL 路径）
    */
-  async startRandomTrialQuestioning(userId: string, player: Player): Promise<ServiceResult<{ pathName: string; pathDescription: string; question: string; options?: string[]; timeoutSeconds?: number; timeoutMessage?: string }>> {
+  async startRandomTrialQuestioning(userId: string, player: Player): Promise<ServiceResult<InitiationStartData>> {
     // 检查是否已有进行中的问心
     if (this.sessions.has(userId)) {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
@@ -536,7 +610,7 @@ export class QuestioningService {
     userId: string,
     session: QuestioningSession,
     path: QuestioningPath
-  ): Promise<ServiceResult<any>> {
+  ): Promise<ServiceResult<InitiationCompleteData>> {
     try {
       // 调用 AI 评估（步入仙途模式）
       const questions = path.questions.map(q => q.question)
@@ -548,7 +622,7 @@ export class QuestioningService {
         answersText
       )
 
-      // 使用 AI 分配的道号和灵根创建玩家
+      // 使用 AI 分配的道号和代码确定的灵根创建玩家
       const createResult = await this.playerService.create({
         userId,
         username: aiResponse.daoName,
@@ -557,7 +631,16 @@ export class QuestioningService {
 
       if (!createResult.success || !createResult.data) {
         this.sessions.delete(userId)
-        return createResult
+        return { success: false, message: createResult.message || '创建角色失败' }
+      }
+
+      // 【重要】增加初始灵根统计计数（公平性系统）
+      try {
+        await this.rootStatsService.incrementRootCount(aiResponse.spiritualRoot as SpiritualRootType)
+        this.ctx.logger('xiuxian').info(`统计已更新：${aiResponse.spiritualRoot} 数量 +1`)
+      } catch (error) {
+        this.ctx.logger('xiuxian').error('更新初始灵根统计失败:', error)
+        // 不影响主流程，继续
       }
 
       // 保存问心记录到数据库
@@ -628,7 +711,7 @@ export class QuestioningService {
   /**
    * 获取问心历史
    */
-  async getHistory(userId: string, limit: number = 5): Promise<ServiceResult> {
+  async getHistory(userId: string, limit: number = 5): Promise<ServiceResult<QuestioningRecord[]>> {
     try {
       const records = await this.ctx.database.get('xiuxian_questioning_v3', {
         userId
@@ -645,6 +728,522 @@ export class QuestioningService {
     } catch (error) {
       this.ctx.logger('xiuxian').error('查询问心历史失败:', error)
       return { success: false, message: '查询失败' }
+    }
+  }
+
+  // ==================== Tag系统新方法 ====================
+
+  /**
+   * 通过Tag启动问道包
+   */
+  async startPackageByTag(
+    userId: string,
+    tag: PathPackageTag,
+    player: Player
+  ): Promise<ServiceResult<{
+    packageId: string
+    packageName: string
+    description: string
+    question: string
+    options?: string[]
+    timeoutSeconds?: number
+    timeoutMessage?: string
+  }>> {
+    // 检查是否已有进行中的问心
+    if (this.sessions.has(userId)) {
+      return { success: false, message: '你正在进行问心，请先完成或取消' }
+    }
+
+    // 随机获取该tag下的问道包
+    const pkg = this.pathPackageService.getRandomByTag(tag, player.realm)
+    if (!pkg) {
+      return { success: false, message: `未找到可用的${tag}问道包` }
+    }
+
+    // 检查冷却时间
+    const cooldownCheck = await this.pathPackageService.checkCooldown(userId, pkg.id)
+    if (!cooldownCheck.canUse) {
+      return {
+        success: false,
+        message: `冷却中，还需 ${cooldownCheck.remainingHours} 小时`
+      }
+    }
+
+    // 创建会话
+    const session: QuestioningSession = {
+      userId,
+      pathId: pkg.id,
+      currentStep: 1,
+      answers: [],
+      startTime: new Date(),
+      lastQuestionTime: new Date(),
+      timeoutSeconds: this.getDefaultTimeoutSeconds()
+    }
+    this.sessions.set(userId, session)
+
+    // 返回第一题
+    const firstQuestion = pkg.questions[0]
+    return {
+      success: true,
+      message: '问道开始',
+      data: {
+        packageId: pkg.id,
+        packageName: pkg.name,
+        description: pkg.description,
+        question: firstQuestion.question,
+        options: firstQuestion.options?.map(o => o.text),
+        timeoutSeconds: session.timeoutSeconds,
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+      }
+    }
+  }
+
+  /**
+   * 通过Tag启动问道包（测试用，不检查境界和冷却）
+   */
+  async startPackageByTagTest(
+    userId: string,
+    tag: PathPackageTag
+  ): Promise<ServiceResult<{
+    packageId: string
+    packageName: string
+    description: string
+    question: string
+    options?: string[]
+    timeoutSeconds?: number
+    timeoutMessage?: string
+  }>> {
+    // 检查是否已有进行中的问心
+    if (this.sessions.has(userId)) {
+      return { success: false, message: '你正在进行问心，请先完成或取消' }
+    }
+
+    // 随机获取该tag下的问道包（不检查条件）
+    const pkg = this.pathPackageService.getRandomByTagNoCheck(tag)
+    if (!pkg) {
+      return { success: false, message: `未找到${tag}问道包` }
+    }
+
+    // 创建会话
+    const session: QuestioningSession = {
+      userId,
+      pathId: pkg.id,
+      currentStep: 1,
+      answers: [],
+      startTime: new Date(),
+      lastQuestionTime: new Date(),
+      timeoutSeconds: this.getDefaultTimeoutSeconds()
+    }
+    this.sessions.set(userId, session)
+
+    // 返回第一题
+    const firstQuestion = pkg.questions[0]
+    return {
+      success: true,
+      message: '问道开始',
+      data: {
+        packageId: pkg.id,
+        packageName: pkg.name,
+        description: pkg.description,
+        question: firstQuestion.question,
+        options: firstQuestion.options?.map(o => o.text),
+        timeoutSeconds: session.timeoutSeconds,
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+      }
+    }
+  }
+
+  /**
+   * 完成问道包并计算分数匹配
+   */
+  async completePackageQuestioning(
+    userId: string,
+    session: QuestioningSession,
+    pkg: PathPackageTemplate
+  ): Promise<ServiceResult<PackageExecutionResult>> {
+    try {
+      // 获取玩家信息
+      const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
+      if (!player) {
+        this.sessions.delete(userId)
+        return { success: false, message: '玩家信息不存在' }
+      }
+
+      // 提取答案（选择题用字母，开放题用文本）
+      const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.letter))
+
+      // ✨ v0.6.0 使用混合分析器（选择题规则 + AI评估开放题）
+      const analysisResult = await this.hybridAnalyzer.analyze(
+        answersText,
+        pkg.questions,
+        {
+          requiresAI: pkg.requiresAI ?? false,
+          enableFallback: this.getAIScoringFallbackEnabled(),
+          maxScorePerDimension: pkg.aiScoringConfig?.maxScorePerDimension,
+          minScorePerDimension: pkg.aiScoringConfig?.minScorePerDimension,
+          openQuestionIndices: pkg.aiScoringConfig?.openQuestionIndices
+        }
+      )
+
+      const personalityScore = analysisResult.finalScore
+
+      // 计算匹配结果（如果问道包有最佳分数配置）
+      let matchResult: MatchResult | undefined
+      let reward = { type: 'spirit_stone' as const, value: 50, description: '+50 灵石' }
+
+      if (pkg.optimalScore) {
+        matchResult = calculateMatchResult(personalityScore, pkg.optimalScore)
+        reward = {
+          type: matchResult.reward.type as any,
+          value: matchResult.reward.value,
+          description: this.getRewardDescription(matchResult.reward.type, matchResult.reward.value)
+        }
+      }
+
+      // 生成AI评语（可以使用AI的reasoning）
+      const aiEvaluation = await this.generatePackageEvaluation(
+        pkg,
+        answersText,
+        personalityScore,
+        matchResult,
+        analysisResult.aiReasoning
+      )
+
+      // 应用奖励
+      await this.applyReward(userId, reward.type, reward.value)
+
+      // 保存记录到数据库
+      await this.ctx.database.create('xiuxian_questioning_v3', {
+        userId,
+        pathId: pkg.id,
+        pathName: pkg.name,
+        answer1: answersText[0] || '',
+        answer2: answersText[1] || '',
+        answer3: answersText[2] || '',
+        aiResponse: JSON.stringify({
+          personalityScore,
+          choiceScore: analysisResult.choiceScore,
+          aiScores: analysisResult.aiScores,
+          usedAI: analysisResult.usedAI,
+          matchResult,
+          evaluation: aiEvaluation
+        }),
+        personality: aiEvaluation.evaluation,
+        tendency: matchResult ? matchResult.tier : 'normal',
+        rewardType: reward.type,
+        rewardValue: reward.value,
+        rewardReason: aiEvaluation.rewardReason,
+        createTime: new Date()
+      })
+
+      // 清除会话
+      this.sessions.delete(userId)
+
+      // 返回结果
+      const result: PackageExecutionResult = {
+        success: true,
+        packageId: pkg.id,
+        packageName: pkg.name,
+        personalityScore,
+        matchResult,
+        aiResponse: aiEvaluation,
+        rewards: [{
+          type: reward.type,
+          value: reward.value,
+          description: reward.description
+        }],
+        message: '问道完成'
+      }
+
+      return {
+        success: true,
+        message: '问道完成',
+        data: result
+      }
+    } catch (error) {
+      this.ctx.logger('xiuxian').error('完成问道包流程错误:', error)
+      this.sessions.delete(userId)
+
+      // ✨ 如果是AI相关错误，给出更明确的提示
+      const errorMessage = (error as Error).message || ''
+      if (errorMessage.includes('AI服务不可用') || errorMessage.includes('AI评分失败')) {
+        return { success: false, message: 'AI服务不可用，请联系管理员配置或稍后重试' }
+      }
+
+      return { success: false, message: '问道评估失败，请稍后重试' }
+    }
+  }
+
+  /**
+   * 获取AI评分降级配置
+   */
+  private getAIScoringFallbackEnabled(): boolean {
+    const config = this.ctx.config as any
+    return config?.enableAIScoringFallback ?? false
+  }
+
+  /**
+   * 生成问道包的AI评语
+   */
+  private async generatePackageEvaluation(
+    pkg: PathPackageTemplate,
+    answers: string[],
+    personalityScore: any,
+    matchResult?: MatchResult,
+    aiReasoning?: string
+  ): Promise<{ evaluation: string; rewardReason: string }> {
+    // 如果AI服务可用，调用AI生成评语
+    const aiService = this.ctx.xiuxianAI
+    if (aiService && aiService.isAvailable()) {
+      try {
+        const prompt = this.buildPackageEvaluationPrompt(pkg, answers, personalityScore, matchResult, aiReasoning)
+
+        // ✨ 调试：记录prompt长度
+        this.ctx.logger('xiuxian').debug(`AI评语prompt长度: ${prompt.length} 字符`)
+        this.ctx.logger('xiuxian').debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
+
+        const response = await aiService.generate(prompt)
+
+        // 检查响应是否为 null
+        if (response) {
+          // ✨ 调试：记录原始响应
+          this.ctx.logger('xiuxian').debug(`AI评语原始响应: ${response}`)
+
+          // ✨ 增强JSON提取：容忍AI在JSON前后添加说明文字
+          let jsonText = response.trim()
+
+          // 尝试提取JSON（查找第一个{到最后一个}）
+          const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+          if (jsonMatch) {
+            jsonText = jsonMatch[0]
+            this.ctx.logger('xiuxian').debug(`提取的JSON: ${jsonText}`)
+          }
+
+          // 解析响应
+          const parsed = JSON.parse(jsonText)
+          return {
+            evaluation: parsed.evaluation || '问道完成',
+            rewardReason: parsed.rewardReason || '完成问道'
+          }
+        } else {
+          this.ctx.logger('xiuxian').warn('AI评语响应为null')
+        }
+      } catch (error) {
+        this.ctx.logger('xiuxian').warn('AI评语生成失败，使用默认评语')
+        this.ctx.logger('xiuxian').debug('AI评语生成错误详情:', error)
+        // ✨ 如果是JSON解析错误，显示错误信息和原始响应
+        if (error instanceof SyntaxError) {
+          this.ctx.logger('xiuxian').warn(`JSON解析失败: ${error.message}`)
+        }
+      }
+    }
+
+    // 降级方案：根据匹配结果生成默认评语
+    if (matchResult) {
+      const tierDesc = generateMatchDescription(matchResult)
+      const hint = matchResult.reward.aiPromptHint || '问道完成'
+      return {
+        evaluation: `${tierDesc}\n${hint}${aiReasoning ? `\n${aiReasoning}` : ''}`,
+        rewardReason: hint
+      }
+    }
+
+    return {
+      evaluation: `你完成了问道，天道已记录你的心性。${aiReasoning ? `\n${aiReasoning}` : ''}`,
+      rewardReason: '完成问道'
+    }
+  }
+
+  /**
+   * 构建问道包评语的AI提示词
+   */
+  private buildPackageEvaluationPrompt(
+    pkg: PathPackageTemplate,
+    answers: string[],
+    personalityScore: any,
+    matchResult?: MatchResult,
+    aiReasoning?: string
+  ): string {
+    let prompt = `你是修仙世界的天道评判者，需要根据修士在"${pkg.name}"中的表现给出评语。
+
+【问道包描述】
+${pkg.description}
+
+【修士回答】
+第1题：${answers[0] || '未回答'}
+第2题：${answers[1] || '未回答'}
+第3题：${answers[2] || '未回答'}
+
+【性格分析】
+${generateSimilarityAnalysis(personalityScore, pkg.optimalScore?.target || personalityScore)}
+`
+
+    if (aiReasoning) {
+      prompt += `
+【AI开放题评分理由】
+${aiReasoning}
+`
+    }
+
+    if (matchResult) {
+      prompt += `
+【匹配结果】
+匹配度：${matchResult.matchRate.toFixed(1)}%
+等级：${matchResult.tier === 'perfect' ? '完美契合' : matchResult.tier === 'good' ? '良好匹配' : '普通匹配'}
+评语提示：${matchResult.reward.aiPromptHint}
+`
+    }
+
+    prompt += `
+【你的任务】
+生成两段评语：
+1. evaluation: 对修士此次问道表现的评价（50字以内，要有修仙风格）
+2. rewardReason: 解释为何获得此等奖励（30字以内）
+
+仅返回JSON格式：
+{"evaluation":"评语内容","rewardReason":"奖励原因"}`
+
+    return prompt
+  }
+
+  /**
+   * 获取指定Tag的所有问道包
+   */
+  getPackagesByTag(tag: PathPackageTag): PathPackageTemplate[] {
+    return this.pathPackageService.getByTag(tag)
+  }
+
+  /**
+   * 获取问道包服务统计
+   */
+  getPackageStats(): {
+    totalPackages: number
+    enabledPackages: number
+    tagCounts: Record<string, number>
+  } {
+    return this.pathPackageService.getStats()
+  }
+
+  /**
+   * 获取问道包服务实例
+   */
+  getPathPackageService(): PathPackageService {
+    return this.pathPackageService
+  }
+
+  /**
+   * 检查答案并处理问道包（扩展submitAnswer以支持问道包）
+   */
+  async submitPackageAnswer(userId: string, answer: string): Promise<ServiceResult<AnswerSubmitData | PackageExecutionResult>> {
+    const session = this.sessions.get(userId)
+    if (!session) {
+      return { success: false, message: '未找到问心会话，请先开始问心' }
+    }
+
+    // 检查是否是问道包（通过pathId前缀判断）
+    const pkg = this.pathPackageService.getById(session.pathId)
+    if (pkg) {
+      // 使用问道包处理逻辑
+      return await this.handlePackageAnswer(userId, answer, session, pkg)
+    }
+
+    // 使用原有的处理逻辑
+    return await this.submitAnswer(userId, answer)
+  }
+
+  /**
+   * 处理问道包答案
+   */
+  private async handlePackageAnswer(
+    userId: string,
+    answer: string,
+    session: QuestioningSession,
+    pkg: PathPackageTemplate
+  ): Promise<ServiceResult<AnswerSubmitData | PackageExecutionResult>> {
+    // 检查是否正在完成中（防止并发重复完成）
+    if (session.isCompleting) {
+      return { success: false, message: '问道正在评估中，请稍候...' }
+    }
+
+    // 检查超时
+    const lastTime = session.lastQuestionTime ? new Date(session.lastQuestionTime).getTime() : session.startTime.getTime()
+    const now = Date.now()
+    const timeout = session.timeoutSeconds ?? this.getDefaultTimeoutSeconds()
+    if (now - lastTime > timeout * 1000) {
+      this.sessions.delete(userId)
+      return { success: false, message: `回答超时：每题限时 ${timeout} 秒，问心已中断` }
+    }
+
+    // 当前问题
+    const currentIndex = session.currentStep - 1
+    const currentQuestion = pkg.questions[currentIndex]
+
+    // 选项题校验
+    if (currentQuestion?.options && currentQuestion.options.length > 0) {
+      const raw = (answer || '').trim()
+      const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
+
+      if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
+        return { success: false, message: `请输入严格的大写选项字母（例如：${validLetters[0]}），有效选项：${validLetters.join('/')}。` }
+      }
+
+      if (!validLetters.includes(raw)) {
+        return { success: false, message: `请输入有效选项（${validLetters.join('/')}）` }
+      }
+
+      const optionText = currentQuestion.options![raw.charCodeAt(0) - 65].text
+      session.answers.push({ letter: raw, text: optionText })
+    } else {
+      // 开放题反作弊检测
+      const detect = this.detectExploitation(answer || '')
+      if (detect.isExploit) {
+        const penalty = detect.severity === 'high' ? -200 : -100
+        await this.applyReward(userId, 'spiritStone', penalty)
+        this.sessions.delete(userId)
+        return {
+          success: true,
+          message: '问道结束',
+          data: {
+            tendency: '违规',
+            reward: {
+              type: 'spiritStone',
+              value: penalty,
+              description: this.getRewardDescription('spiritStone', penalty)
+            },
+            reason: detect.reason,
+            personality: '回答异常，已处罚。'
+          }
+        }
+      }
+      session.answers.push(answer)
+    }
+
+    // 检查是否完成所有问题
+    if (session.currentStep >= 3) {
+      // 设置完成标志，防止并发重复完成
+      session.isCompleting = true
+      this.sessions.set(userId, session)
+
+      return await this.completePackageQuestioning(userId, session, pkg)
+    }
+
+    // 进入下一题
+    session.currentStep++
+    const nextQuestion = pkg.questions[session.currentStep - 1]
+    session.lastQuestionTime = new Date()
+
+    const timeoutForNext = session.timeoutSeconds ?? this.getDefaultTimeoutSeconds()
+    return {
+      success: true,
+      message: '答案已记录',
+      data: {
+        step: session.currentStep,
+        question: nextQuestion.question,
+        options: nextQuestion.options?.map(o => o.text),
+        isLastQuestion: session.currentStep === 3,
+        timeoutSeconds: timeoutForNext,
+        timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`
+      }
     }
   }
 }
