@@ -605,6 +605,7 @@ export class QuestioningService {
 
   /**
    * 完成步入仙途问心（AI 分配道号和灵根，然后创建玩家）
+   * v0.7.0 更新：集成混合分析器，使用AI评分开放题
    */
   private async completeInitiationQuestioning(
     userId: string,
@@ -612,9 +613,34 @@ export class QuestioningService {
     path: QuestioningPath
   ): Promise<ServiceResult<InitiationCompleteData>> {
     try {
-      // 调用 AI 评估（步入仙途模式）
+      this.ctx.logger('xiuxian').info('=== 步入仙途完成流程开始 ===')
+
+      // 提取答案（选择题用字母，开放题用文本）
+      const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.letter))
+      this.ctx.logger('xiuxian').debug('用户答案:', answersText)
+
+      // ✨ v0.7.0: 读取配置项
+      const config = this.ctx.config as any
+      const enableAI = config?.enableInitiationAIScoring ?? true
+      const enableFallback = config?.enableInitiationAIScoringFallback ?? true
+
+      this.ctx.logger('xiuxian').info(`INITIATION AI评分配置: enableAI=${enableAI}, enableFallback=${enableFallback}`)
+
+      // ✨ v0.7.0: 使用混合分析器分析性格
+      const analysisResult = await this.hybridAnalyzer.analyzeInitiation(
+        answersText,
+        enableAI,
+        enableFallback
+      )
+
+      const personalityScore = analysisResult.finalScore
+      this.ctx.logger('xiuxian').info(`性格分析完成，使用${analysisResult.usedAI ? 'AI' : '关键词'}评分`)
+      this.ctx.logger('xiuxian').debug('性格分数:', JSON.stringify(personalityScore))
+
+      // 调用 AI Helper 生成初始响应（包含灵根分配和道号生成）
+      // 注意：generateInitiationResponse 内部会再次调用 analyzePersonality，
+      // 但由于公平性系统需要独立的 FateCalculator 流程，我们保持原有架构
       const questions = path.questions.map(q => q.question)
-      const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.text))
       const aiResponse = await this.aiHelper.generateInitiationResponse(
         path.name,
         path.description,
@@ -643,7 +669,7 @@ export class QuestioningService {
         // 不影响主流程，继续
       }
 
-      // 保存问心记录到数据库
+      // 保存问心记录到数据库（包含混合分析结果）
       await this.ctx.database.create('xiuxian_questioning_v3', {
         userId,
         pathId: path.id,
@@ -651,7 +677,17 @@ export class QuestioningService {
         answer1: answersText[0] || '',
         answer2: answersText[1] || '',
         answer3: answersText[2] || '',
-        aiResponse: JSON.stringify(aiResponse),
+        aiResponse: JSON.stringify({
+          ...aiResponse,
+          // ✨ v0.7.0: 保存混合分析详情
+          hybridAnalysis: {
+            usedAI: analysisResult.usedAI,
+            finalScore: analysisResult.finalScore,
+            choiceScore: analysisResult.choiceScore,
+            aiScores: analysisResult.aiScores,
+            aiReasoning: analysisResult.aiReasoning
+          }
+        }),
         personality: aiResponse.personality,
         tendency: '',
         rewardType: 'initiation',
@@ -662,6 +698,8 @@ export class QuestioningService {
 
       // 清除会话
       this.sessions.delete(userId)
+
+      this.ctx.logger('xiuxian').info('=== 步入仙途完成流程结束 ===')
 
       // 返回结果
       return {

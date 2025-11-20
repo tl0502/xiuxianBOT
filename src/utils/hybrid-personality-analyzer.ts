@@ -6,7 +6,7 @@
  */
 
 import { Context } from 'koishi'
-import { PersonalityScore } from './personality-analyzer'
+import { PersonalityScore, analyzePersonality } from './personality-analyzer'
 import { AIOpenQuestionScorer, AIOpenQuestionScore } from './ai-open-question-scorer'
 import { Question } from '../config/questioning'
 
@@ -314,4 +314,113 @@ export class HybridPersonalityAnalyzer {
 
     return traits.length > 0 ? traits.join('、') : '平凡'
   }
+
+  /**
+   * ✨ v0.7.0 新增：INITIATION 专用分析
+   *
+   * 与问道包AI评分的关键区别：
+   * 1. 选择题使用 personality-analyzer.ts 的精确规则（而非混合分析器的简化规则）
+   * 2. 开放题使用客观、无偏向的AI评分
+   * 3. 总是允许降级（不能阻止创角流程）
+   *
+   * @param answers 用户的3个回答 [A, B, "开放文本"]
+   * @param enableAI 是否启用AI评分开放题
+   * @param enableFallback AI失败时是否降级（建议true）
+   * @returns 混合分析结果
+   */
+  async analyzeInitiation(
+    answers: string[],
+    enableAI: boolean = true,
+    enableFallback: boolean = true
+  ): Promise<HybridAnalysisResult> {
+    this.ctx.logger('xiuxian').info('=== INITIATION 混合分析开始 ===')
+    this.ctx.logger('xiuxian').info(`AI评分: ${enableAI ? '启用' : '禁用'}, 降级: ${enableFallback ? '允许' : '禁止'}`)
+
+    try {
+      // 1. 使用 personality-analyzer.ts 分析所有3题（包含关键词评分开放题）
+      const baselineScore = analyzePersonality(answers)
+      this.ctx.logger('xiuxian').debug('基准分数（规则+关键词）:', JSON.stringify(baselineScore))
+
+      // 2. 如果不启用AI，直接返回基准分数
+      if (!enableAI) {
+        this.ctx.logger('xiuxian').info('AI评分未启用，使用关键词评分')
+        return {
+          finalScore: baselineScore,
+          choiceScore: baselineScore,
+          usedAI: false
+        }
+      }
+
+      // 3. AI评分开放题（第3题）
+      const openQuestionAnswer = answers[2]
+      if (!openQuestionAnswer || openQuestionAnswer.trim().length === 0) {
+        this.ctx.logger('xiuxian').warn('第3题答案为空，使用关键词评分')
+        return {
+          finalScore: baselineScore,
+          choiceScore: baselineScore,
+          usedAI: false
+        }
+      }
+
+      // 4. 调用AI评分（使用INITIATION专用Prompt）
+      this.ctx.logger('xiuxian').info('调用AI客观评分第3题...')
+      const aiResult = await this.aiScorer.scoreInitiationOpenQuestion(
+        openQuestionAnswer,
+        answers.slice(0, 2),  // 前2题答案（用于一致性检查）
+        {
+          enableFallback,
+          maxScore: 5,    // INITIATION 评分范围更保守
+          minScore: -3
+        }
+      )
+
+      // 5. 重新计算最终分数：选择题（第1-2题规则评分）+ AI开放题评分
+      // 注意：baselineScore 包含了关键词评分的第3题，需要分离
+      const choiceOnlyScore = this.extractChoiceScore(answers)
+      const finalScore = this.mergeScores(choiceOnlyScore, [aiResult.personality])
+
+      this.ctx.logger('xiuxian').info('AI评分成功')
+      this.ctx.logger('xiuxian').debug('选择题分数:', JSON.stringify(choiceOnlyScore))
+      this.ctx.logger('xiuxian').debug('AI开放题分数:', JSON.stringify(aiResult.personality))
+      this.ctx.logger('xiuxian').debug('最终分数:', JSON.stringify(finalScore))
+
+      return {
+        finalScore,
+        choiceScore: choiceOnlyScore,
+        aiScores: [aiResult],
+        aiReasoning: aiResult.reasoning,
+        usedAI: true,
+        openQuestionIndices: [2]
+      }
+
+    } catch (error) {
+      this.ctx.logger('xiuxian').error('INITIATION AI评分失败:', error)
+
+      // 检查是否允许降级
+      if (!enableFallback) {
+        this.ctx.logger('xiuxian').error('不允许降级，抛出错误')
+        throw error
+      }
+
+      // 降级到关键词评分
+      this.ctx.logger('xiuxian').warn('降级使用关键词评分')
+      const fallbackScore = analyzePersonality(answers)
+
+      return {
+        finalScore: fallbackScore,
+        choiceScore: fallbackScore,
+        usedAI: false
+      }
+    }
+  }
+
+  /**
+   * 提取选择题分数（仅第1-2题，不含第3题开放题）
+   */
+  private extractChoiceScore(answers: string[]): PersonalityScore {
+    // 复用 personality-analyzer.ts 的逻辑，但只传入前2题
+    const choiceAnswers = [answers[0], answers[1], '']  // 第3题留空
+    return analyzePersonality(choiceAnswers)
+  }
 }
+
