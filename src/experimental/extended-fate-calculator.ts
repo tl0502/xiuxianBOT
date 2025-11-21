@@ -46,6 +46,7 @@
  */
 
 import { Context } from 'koishi'
+import { KoishiAppContext } from '../adapters/koishi'
 import { SpiritualRootType } from '../config/spiritual-roots'
 import {
   RootGradeConfig,
@@ -69,7 +70,8 @@ export class ExtendedFateCalculator {
   private rootStatsService: RootStatsService
 
   constructor(private ctx: Context) {
-    this.rootStatsService = new RootStatsService(ctx)
+    const appContext = KoishiAppContext.from(ctx)
+    this.rootStatsService = new RootStatsService(appContext)
   }
 
   /**

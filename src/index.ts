@@ -1,6 +1,7 @@
 import { Context, Schema } from 'koishi'
 import { initDatabase } from './database'
 import { registerCommands } from './commands'
+import { KoishiAppContext } from './adapters/koishi'
 import { RootStatsService } from './services/root-stats.service'
 import * as chatluna from './chatluna'
 import { PersonalitySystemVersion, setPersonalitySystemConfig } from './config/personality-system-config'
@@ -91,7 +92,8 @@ export function apply(ctx: Context, config: Config) {
   // 初始化灵根统计表（公平性系统）
   ctx.on('ready', async () => {
     try {
-      const rootStatsService = new RootStatsService(ctx)
+      const appContext = KoishiAppContext.from(ctx)
+      const rootStatsService = new RootStatsService(appContext)
       await rootStatsService.initializeStats()
       ctx.logger('xiuxian').info('初始灵根统计表已初始化')
     } catch (error) {

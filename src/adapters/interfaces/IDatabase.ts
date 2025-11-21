@@ -65,7 +65,9 @@ export interface QueryOptions {
   limit?: number
   /** 跳过记录数 */
   offset?: number
-  /** 排序字段 */
+  /** 排序字段（Koishi 风格） */
+  sort?: Record<string, 'asc' | 'desc'>
+  /** 排序字段（通用风格） */
   orderBy?: {
     field: string
     order: 'asc' | 'desc'

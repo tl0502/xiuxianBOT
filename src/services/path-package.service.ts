@@ -1,8 +1,10 @@
 /**
  * 问道包管理服务 - 处理Tag注册、查询和随机选择
+ *
+ * 注意：此服务已解耦 Koishi 框架，依赖 IAppContext 接口
  */
 
-import { Context } from 'koishi'
+import { IAppContext } from '../adapters/interfaces'
 import {
   PathPackageTemplate,
   PathPackageTag,
@@ -21,7 +23,7 @@ export class PathPackageService {
   // Tag索引（加速查询）
   private tagIndex: Map<PathPackageTag, Set<string>> = new Map()
 
-  constructor(private ctx: Context) {}
+  constructor(private context: IAppContext) {}
 
   /**
    * 注册问道包
@@ -29,7 +31,7 @@ export class PathPackageService {
   register(pkg: PathPackageTemplate, enabled: boolean = true): void {
     // 检查ID唯一性
     if (this.registry.has(pkg.id)) {
-      this.ctx.logger('xiuxian').warn(`问道包 ${pkg.id} 已存在，将被覆盖`)
+      this.context.logger.warn(`问道包 ${pkg.id} 已存在，将被覆盖`)
     }
 
     // 注册到主表
@@ -47,7 +49,7 @@ export class PathPackageService {
       this.tagIndex.get(tag)!.add(pkg.id)
     }
 
-    this.ctx.logger('xiuxian').info(`注册问道包：${pkg.name} [${pkg.tags.join(', ')}]`)
+    this.context.logger.info(`注册问道包：${pkg.name} [${pkg.tags.join(', ')}]`)
   }
 
   /**
@@ -238,10 +240,10 @@ export class PathPackageService {
     }
 
     // 查询最近一次该问道包的记录
-    const records = await this.ctx.database.get('xiuxian_questioning_v3', {
+    const records = await this.context.database.get<any>('xiuxian_questioning_v3', {
       userId,
       pathId: packageId
-    }, {
+    } as any, {
       sort: { createTime: 'desc' },
       limit: 1
     })

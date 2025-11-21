@@ -22,6 +22,11 @@ export interface IAppContext {
    * AI 服务（可选，某些环境可能不可用）
    */
   ai?: IAIService
+
+  /**
+   * 配置对象（可选，用于访问插件配置）
+   */
+  config?: any
 }
 
 /**
