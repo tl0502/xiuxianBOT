@@ -46,6 +46,12 @@ export function initPlayerModel(ctx: Context) {
     createTime: 'timestamp',
     lastActiveTime: 'timestamp',
 
+    // 封禁状态（v0.9.2 新增）
+    isBanned: { type: 'boolean', initial: false },
+    banReason: 'string',
+    bannedAt: 'timestamp',
+    bannedUntil: 'timestamp',  // null = 永久封禁
+
     // 统计
     totalCombatWin: { type: 'unsigned', initial: 0 },
     totalCombatLose: { type: 'unsigned', initial: 0 },

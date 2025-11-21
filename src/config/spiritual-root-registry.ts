@@ -10,6 +10,7 @@
  */
 
 import { SpiritualRootType, SpiritualRootCategory } from './spiritual-roots'
+import { PathPackageConfig } from './constants'
 
 /**
  * 9维性格评分类型
@@ -375,8 +376,8 @@ export function calculatePersonalityMatch(
     score += personalityValue * (weight ?? 0)
   }
 
-  // 限制在 -10 到 +10 范围
-  return Math.max(-10, Math.min(10, score))
+  // 限制在 MATCH_SCORE_MIN 到 MATCH_SCORE_MAX 范围
+  return Math.max(PathPackageConfig.MATCH_SCORE_MIN, Math.min(PathPackageConfig.MATCH_SCORE_MAX, score))
 }
 
 /**

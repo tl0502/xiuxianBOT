@@ -143,8 +143,8 @@ export function apply(ctx: Context, config: Config) {
     ctx.plugin(chatluna, config.chatluna)
   }
 
-  // 注册所有命令
-  registerCommands(ctx)
+  // 注册所有命令（传入插件配置）
+  registerCommands(ctx, config)
 
   // 插件启动日志
   ctx.logger('xiuxian').info('修仙插件已启动')

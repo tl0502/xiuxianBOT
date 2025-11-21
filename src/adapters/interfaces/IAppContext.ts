@@ -39,11 +39,6 @@ export interface IAIService {
   isAvailable(): boolean
 
   /**
-   * 检查是否允许降级到模拟响应
-   */
-  isFallbackEnabled(): boolean
-
-  /**
    * 生成 AI 响应
    * @param prompt 提示词
    * @returns AI 生成的文本，失败返回 null

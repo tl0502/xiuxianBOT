@@ -18,10 +18,7 @@ import {
   getBaseChanceDistribution,
   calculatePersonalityMatch
 } from '../config/spiritual-root-registry'
-import {
-  PERSONALITY_ADJUSTMENT,
-  STATISTICAL_BALANCE_THRESHOLD
-} from '../config/fate-distribution'
+import { SpiritualRootConfig } from '../config/constants'
 import { PersonalityScore } from './personality-analyzer'
 import { RootStatsService } from '../services/root-stats.service'
 
@@ -60,12 +57,12 @@ export class FateCalculator {
 
     // 第3步：应用统计平衡（如果达到阈值）
     const totalPlayers = await this.rootStatsService.getTotalPlayerCount()
-    if (totalPlayers >= STATISTICAL_BALANCE_THRESHOLD) {
-      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} >= ${STATISTICAL_BALANCE_THRESHOLD}，启用统计平衡`)
+    if (totalPlayers >= SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD) {
+      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} >= ${SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD}，启用统计平衡`)
       distribution = await this.applyStatisticalBalance(distribution)
       this.logDistribution('统计平衡后', distribution)
     } else {
-      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} < ${STATISTICAL_BALANCE_THRESHOLD}，跳过统计平衡`)
+      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} < ${SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD}，跳过统计平衡`)
     }
 
     // 第4步：归一化到 100%
@@ -102,10 +99,10 @@ export class FateCalculator {
 
       if (matchScore > 0) {
         // 正面匹配，上调（0-8%）
-        adjustment = (matchScore / 10) * PERSONALITY_ADJUSTMENT.MAX_INCREASE
+        adjustment = (matchScore / 10) * SpiritualRootConfig.MAX_PERSONALITY_INCREASE
       } else if (matchScore < 0) {
         // 负面匹配，下调（0-10%）
-        adjustment = (matchScore / 10) * PERSONALITY_ADJUSTMENT.MAX_DECREASE
+        adjustment = (matchScore / 10) * SpiritualRootConfig.MAX_PERSONALITY_DECREASE
       }
 
       const newProb = Math.max(0, baseProb + adjustment)
@@ -166,7 +163,10 @@ export class FateCalculator {
       const adjustmentFactor = -deviation * 0.5  // 系数 0.5 控制调整力度
 
       // 限制调整范围（-5% 到 +5%）
-      const adjustment = Math.max(-0.05, Math.min(0.05, adjustmentFactor))
+      const adjustment = Math.max(
+        -SpiritualRootConfig.STATISTICAL_BALANCE_MAX_ADJUSTMENT,
+        Math.min(SpiritualRootConfig.STATISTICAL_BALANCE_MAX_ADJUSTMENT, adjustmentFactor)
+      )
 
       const newProb = Math.max(0, currentProb + adjustment)
       balanced.set(rootType, newProb)

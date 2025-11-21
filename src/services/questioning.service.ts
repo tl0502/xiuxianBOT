@@ -42,11 +42,11 @@ export class QuestioningService {
   private hybridAnalyzer: HybridPersonalityAnalyzer
   private cleanupInterval: NodeJS.Timeout
 
-  constructor(private ctx: Context) {
-    // 创建 Adapter 上下文
-    this.context = KoishiAppContext.from(ctx)
+  constructor(private ctx: Context, pluginConfig?: any) {
+    // 创建 Adapter 上下文（传入插件配置）
+    this.context = KoishiAppContext.from(ctx, 'xiuxian', pluginConfig)
 
-    this.aiHelper = new AIHelper(ctx)
+    this.aiHelper = new AIHelper(ctx, pluginConfig)
     this.playerService = new PlayerService(this.context)
     this.rootStatsService = new RootStatsService(this.context)
     this.pathPackageService = new PathPackageService(this.context)
@@ -599,6 +599,16 @@ export class QuestioningService {
     } catch (error) {
       this.context.logger.error('步入仙途问心完成流程错误:', error)
       this.sessions.delete(userId)
+
+      // ✨ 如果是AI相关错误，给出更明确的提示
+      const errorMessage = (error as Error).message || ''
+      if (errorMessage.includes('AI服务不可用')) {
+        return { success: false, message: 'AI服务不可用，且未启用降级模式。请联系管理员配置AI服务或开启降级模式。' }
+      }
+      if (errorMessage.includes('AI评分失败') || errorMessage.includes('AI返回空响应')) {
+        return { success: false, message: 'AI评分失败，且未启用降级模式。请稍后重试或联系管理员开启降级模式。' }
+      }
+
       return { success: false, message: '问心评估失败，请稍后重试' }
     }
   }
@@ -838,7 +848,12 @@ export class QuestioningService {
           analysisResult.aiReasoning
         )
       } else {
-        // 使用降级评语
+        // AI评语被禁用，检查是否允许使用降级评语
+        const enableAIEvaluationFallback = this.getAIEvaluationFallbackEnabled()
+        if (!enableAIEvaluationFallback) {
+          this.context.logger.error('AI评语被禁用，且未启用降级评语')
+          throw new Error('AI评语被禁用，且未启用降级模式。请联系管理员启用AI评语或开启降级模式。')
+        }
         this.context.logger.info('AI评语被禁用，使用降级评语')
         aiEvaluation = this.getFallbackEvaluation(pkg, matchResult)
       }

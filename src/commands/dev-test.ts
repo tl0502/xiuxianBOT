@@ -86,25 +86,36 @@ export function registerDevTestCommands(ctx: Context) {
 
         let message = `\n\n━━━━ 灵根分布统计 ━━━━\n\n`
 
-        let total = 0
-        for (const count of stats.values()) {
-          total += count
+        let totalInitial = 0
+        let totalCurrent = 0
+        for (const counts of stats.values()) {
+          totalInitial += counts.initialCount
+          totalCurrent += counts.currentCount
         }
 
-        if (total === 0) {
+        if (totalInitial === 0 && totalCurrent === 0) {
           message += '暂无玩家数据\n'
         } else {
-          // 转换 Map 为数组并排序
-          const sorted = Array.from(stats.entries()).sort((a, b) => b[1] - a[1])
+          // 转换 Map 为数组并按 initialCount 排序
+          const sorted = Array.from(stats.entries()).sort((a, b) => b[1].initialCount - a[1].initialCount)
 
-          for (const [rootType, num] of sorted) {
-            if (num > 0) {
-              const percent = ((num / total) * 100).toFixed(1)
-              message += `${rootType}: ${num} (${percent}%)\n`
+          message += `【初始灵根】\n`
+          for (const [rootType, counts] of sorted) {
+            if (counts.initialCount > 0) {
+              const percent = ((counts.initialCount / totalInitial) * 100).toFixed(1)
+              message += `${rootType}: ${counts.initialCount} (${percent}%)\n`
             }
           }
 
-          message += `\n总计: ${total} 人`
+          message += `\n【当前灵根】\n`
+          for (const [rootType, counts] of sorted) {
+            if (counts.currentCount > 0) {
+              const percent = ((counts.currentCount / totalCurrent) * 100).toFixed(1)
+              message += `${rootType}: ${counts.currentCount} (${percent}%)\n`
+            }
+          }
+
+          message += `\n总计: ${totalInitial} 人（初始）/ ${totalCurrent} 人（当前）`
         }
 
         message += `\n\n━━━━━━━━━━━━━━`
@@ -114,6 +125,22 @@ export function registerDevTestCommands(ctx: Context) {
       } catch (error) {
         ctx.logger('xiuxian').error('查看统计失败:', error)
         return atMessage(session.userId, ' 查询失败')
+      }
+    })
+
+  /**
+   * 同步统计（从玩家表重新统计）
+   */
+  ctx.command('修仙.同步统计', '从玩家表重新统计灵根分布（开发者）')
+    .action(async ({ session }) => {
+      if (!session?.userId) return '系统错误：无法获取用户信息'
+
+      try {
+        await rootStatsService.rebuildStats()
+        return atMessage(session.userId, ' 灵根统计已同步，使用 修仙.查看统计 查看结果')
+      } catch (error) {
+        ctx.logger('xiuxian').error('同步统计失败:', error)
+        return atMessage(session.userId, ' 同步失败')
       }
     })
 

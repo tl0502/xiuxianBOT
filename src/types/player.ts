@@ -37,6 +37,12 @@ export interface Player {
   createTime: Date              // 创建时间
   lastActiveTime: Date          // 最后活跃时间
 
+  // 封禁状态（v0.9.2 新增）
+  isBanned: boolean             // 是否封禁
+  banReason?: string            // 封禁原因
+  bannedAt?: Date               // 封禁时间
+  bannedUntil?: Date            // 封禁截止（null = 永久）
+
   // 统计
   totalCombatWin: number        // 总胜场
   totalCombatLose: number       // 总败场

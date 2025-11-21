@@ -50,10 +50,9 @@ import { KoishiAppContext } from '../adapters/koishi'
 import { SpiritualRootType } from '../config/spiritual-roots'
 import {
   RootGradeConfig,
-  PERSONALITY_ADJUSTMENT,
-  STATISTICAL_BALANCE_THRESHOLD,
   getEnabledGrades
 } from '../config/fate-distribution'
+import { SpiritualRootConfig, PathPackageConfig } from '../config/constants'
 import { ExtendedPersonalityScore } from './personality-dimensions'
 import { RootStatsService } from '../services/root-stats.service'
 import { PathPackageDefinition } from './path-packages'
@@ -104,12 +103,12 @@ export class ExtendedFateCalculator {
 
     // 第4步：应用统计平衡（如果达到阈值）
     const totalPlayers = await this.rootStatsService.getTotalPlayerCount()
-    if (totalPlayers >= STATISTICAL_BALANCE_THRESHOLD) {
-      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} >= ${STATISTICAL_BALANCE_THRESHOLD}，启用统计平衡`)
+    if (totalPlayers >= SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD) {
+      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} >= ${SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD}，启用统计平衡`)
       distribution = await this.applyStatisticalBalance(distribution)
       this.logDistribution('统计平衡后', distribution)
     } else {
-      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} < ${STATISTICAL_BALANCE_THRESHOLD}，跳过统计平衡`)
+      this.ctx.logger('xiuxian').info(`总玩家数 ${totalPlayers} < ${SpiritualRootConfig.STATISTICAL_BALANCE_THRESHOLD}，跳过统计平衡`)
     }
 
     // 第5步：归一化到 100%
@@ -165,10 +164,10 @@ export class ExtendedFateCalculator {
 
       if (matchScore > 0) {
         // 正面匹配，上调（0-8%）
-        adjustment = (matchScore / 10) * PERSONALITY_ADJUSTMENT.MAX_INCREASE
+        adjustment = (matchScore / 10) * SpiritualRootConfig.MAX_PERSONALITY_INCREASE
       } else if (matchScore < 0) {
         // 负面匹配，下调（0-10%）
-        adjustment = (matchScore / 10) * PERSONALITY_ADJUSTMENT.MAX_DECREASE
+        adjustment = (matchScore / 10) * SpiritualRootConfig.MAX_PERSONALITY_DECREASE
       }
 
       const newProb = Math.max(0, baseProb + adjustment)
@@ -291,8 +290,8 @@ export class ExtendedFateCalculator {
       }
     }
 
-    // 限制在 -10 到 +10 范围
-    return Math.max(-10, Math.min(10, score))
+    // 限制在 MATCH_SCORE_MIN 到 MATCH_SCORE_MAX 范围
+    return Math.max(PathPackageConfig.MATCH_SCORE_MIN, Math.min(PathPackageConfig.MATCH_SCORE_MAX, score))
   }
 
   /**

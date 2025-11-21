@@ -71,16 +71,6 @@ export class XiuxianAIService extends Service {
   isAvailable(): boolean {
     return !!this.modelRef?.value
   }
-
-  /**
-   * 检查是否允许降级到模拟响应
-   * 注意：从主配置的 enableInitiationAIResponseFallback 读取
-   */
-  isFallbackEnabled(): boolean {
-    // 从父级配置读取步入仙途的降级开关
-    const parentConfig = (this.ctx as any).config
-    return parentConfig?.enableInitiationAIResponseFallback ?? false
-  }
 }
 
 // 扩展 Context 类型
