@@ -49,7 +49,8 @@ export class HybridPersonalityAnalyzer {
   async analyze(
     answers: string[],
     questions: Question[],
-    options?: HybridAnalysisOptions
+    options?: HybridAnalysisOptions,
+    weights?: { choiceWeight: number; openWeight: number }
   ): Promise<HybridAnalysisResult> {
     // 1. 先用规则分析选择题
     const choiceScore = this.analyzeChoiceQuestions(answers, questions)
@@ -117,8 +118,8 @@ export class HybridPersonalityAnalyzer {
       }
     }
 
-    // 4. 合并分数
-    const finalScore = this.mergeScores(choiceScore, aiScores.map(s => s.personality))
+    // 4. 合并分数（传递权重）
+    const finalScore = this.mergeScores(choiceScore, aiScores.map(s => s.personality), weights)
 
     // 5. 合并AI评分理由
     const aiReasoning = aiScores
@@ -254,15 +255,110 @@ export class HybridPersonalityAnalyzer {
   }
 
   /**
-   * 合并选择题分数和AI开放题分数
+   * 合并选择题分数和AI开放题分数（使用加权平均）
+   *
+   * v0.8.2 改进：从简单加法改为加权平均算法
+   * - 选择题权重默认30%
+   * - 开放题权重默认70%
+   * - 权重可通过包模板自定义配置
    */
   private mergeScores(
+    choiceScore: PersonalityScore,
+    aiScores: PersonalityScore[],
+    weights?: { choiceWeight: number; openWeight: number }
+  ): PersonalityScore {
+    // 默认权重
+    const choiceWeight = weights?.choiceWeight ?? 0.3
+    const openWeight = weights?.openWeight ?? 0.7
+
+    // 计算AI平均分（多个开放题的平均值）
+    const avgAI = this.averageScores(aiScores)
+
+    // 加权平均（替代原来的简单加法）
+    const merged: PersonalityScore = {
+      determination: 0,
+      courage: 0,
+      stability: 0,
+      focus: 0,
+      honesty: 0,
+      kindness: 0,
+      greed: 0,
+      impatience: 0,
+      manipulation: 0
+    }
+
+    for (const key in choiceScore) {
+      const k = key as keyof PersonalityScore
+      merged[k] = choiceScore[k] * choiceWeight + avgAI[k] * openWeight
+      // 限制在0-10范围
+      merged[k] = Math.max(0, Math.min(10, merged[k]))
+    }
+
+    return merged
+  }
+
+  /**
+   * 计算多个AI分数的平均值
+   */
+  private averageScores(scores: PersonalityScore[]): PersonalityScore {
+    if (scores.length === 0) {
+      return {
+        determination: 0,
+        courage: 0,
+        stability: 0,
+        focus: 0,
+        honesty: 0,
+        kindness: 0,
+        greed: 0,
+        impatience: 0,
+        manipulation: 0
+      }
+    }
+
+    const avg: PersonalityScore = {
+      determination: 0,
+      courage: 0,
+      stability: 0,
+      focus: 0,
+      honesty: 0,
+      kindness: 0,
+      greed: 0,
+      impatience: 0,
+      manipulation: 0
+    }
+
+    for (const score of scores) {
+      for (const key in score) {
+        const k = key as keyof PersonalityScore
+        avg[k] = (avg[k] || 0) + (score[k] || 0)
+      }
+    }
+
+    // 计算平均值
+    for (const key in avg) {
+      const k = key as keyof PersonalityScore
+      avg[k] /= scores.length
+    }
+
+    return avg
+  }
+
+  /**
+   * 简单加法合并分数（向后兼容，用于步入仙途INITIATION）
+   *
+   * ⚠️ 重要：此方法保持原有的简单加法逻辑，不使用加权平均
+   * 原因：灵根分配系统的公平性算法依赖于特定的分数分布
+   * 如果改变评分算法，会破坏灵根概率的统计平衡
+   *
+   * 仅用于 analyzeInitiation()，普通问道包使用 mergeScores()
+   */
+  private mergeScoresSimple(
     choiceScore: PersonalityScore,
     aiScores: PersonalityScore[]
   ): PersonalityScore {
     const merged: PersonalityScore = { ...choiceScore }
 
-    // 累加所有AI评分
+    // 累加所有AI评分（原有逻辑）
     for (const aiScore of aiScores) {
       for (const key in aiScore) {
         const k = key as keyof PersonalityScore
@@ -377,7 +473,10 @@ export class HybridPersonalityAnalyzer {
       // 5. 重新计算最终分数：选择题（第1-2题规则评分）+ AI开放题评分
       // 注意：baselineScore 包含了关键词评分的第3题，需要分离
       const choiceOnlyScore = this.extractChoiceScore(answers)
-      const finalScore = this.mergeScores(choiceOnlyScore, [aiResult.personality])
+
+      // ⚠️ INITIATION 使用简单加法保持向后兼容（灵根分配公平性依赖）
+      // 不使用加权平均，因为会改变分数分布，影响灵根概率
+      const finalScore = this.mergeScoresSimple(choiceOnlyScore, [aiResult.personality])
 
       this.ctx.logger('xiuxian').info('AI评分成功')
       this.ctx.logger('xiuxian').debug('选择题分数:', JSON.stringify(choiceOnlyScore))

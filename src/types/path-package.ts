@@ -79,6 +79,22 @@ export interface AIScoringConfig {
 }
 
 /**
+ * 评分权重配置（v0.8.2 新增）
+ */
+export interface ScoringWeights {
+  choiceWeight: number    // 选择题权重（0-1，默认0.3）
+  openWeight: number      // 开放题权重（0-1，默认0.7）
+}
+
+/**
+ * AI功能开关配置（v0.8.2 新增）
+ */
+export interface AIFeatures {
+  enableScoring: boolean      // 是否启用AI打分
+  enableEvaluation: boolean   // 是否启用AI评语
+}
+
+/**
  * 问道包模板（核心接口）
  */
 export interface PathPackageTemplate {
@@ -97,8 +113,14 @@ export interface PathPackageTemplate {
   optimalScore?: OptimalScoreConfig
 
   // ✨ v0.6.0 新增：AI评分配置
-  requiresAI?: boolean                    // 是否需要AI评分开放题（默认false）
+  requiresAI?: boolean                    // 是否需要AI评分开放题（默认false，向后兼容，等价于两个新开关都设为true）
   aiScoringConfig?: AIScoringConfig       // AI评分详细配置
+
+  // ✨ v0.8.2 新增：评分权重配置
+  scoringWeights?: ScoringWeights         // 选择题和开放题的权重（默认0.3/0.7）
+
+  // ✨ v0.8.2 新增：AI功能开关（独立控制）
+  aiFeatures?: AIFeatures                 // AI功能开关（打分和评语独立控制）
 
   // 元信息
   version?: string                        // 版本号

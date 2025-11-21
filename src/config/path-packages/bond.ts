@@ -17,8 +17,17 @@ export const bondPackages: PathPackageTemplate[] = [
       triggerChance: 0.15    // 15%触发率
     },
 
-    // ✨ v0.6.0 启用AI评分
-    requiresAI: true,
+    // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
+    scoringWeights: {
+      choiceWeight: 0.3,  // 选择题30%
+      openWeight: 0.7     // 开放题70%
+    },
+
+    // ✨ v0.8.2 新增：AI功能独立控制
+    aiFeatures: {
+      enableScoring: true,      // 启用AI打分
+      enableEvaluation: true    // 启用AI评语
+    },
 
     // ✨ v0.6.0 AI评分配置
     aiScoringConfig: {

@@ -76,6 +76,20 @@ export class AIHelper {
     const rootInfo = SPIRITUAL_ROOTS[selectedRoot]
     this.ctx.logger('xiuxian').info(`代码已确定灵根：${selectedRoot}（${rootInfo.name}）`)
 
+    // ✨ v0.8.2 检查是否启用AI生成道号和评语
+    const config = (this.ctx as any).config
+    const enableAIResponse = config?.enableInitiationAIResponse ?? true
+
+    if (!enableAIResponse) {
+      this.ctx.logger('xiuxian').info('AI生成道号/评语功能已禁用，使用默认响应')
+      return {
+        daoName: `修士${Math.floor(Math.random() * 1000)}`,
+        spiritualRoot: selectedRoot,
+        personality: personalityDesc,
+        reason: `你的性格：${personalityDesc}\n天道已定：${rootInfo.name}\n踏入仙途，愿你勇猛精进`
+      }
+    }
+
     // 【第3步】调用 AI 生成道号和评语（AI 不选择灵根）
     const response = await this.callChatLunaForInitiation(answers, selectedRoot, personalityDesc)
 
@@ -208,41 +222,47 @@ export class AIHelper {
       const rootInfo = SPIRITUAL_ROOTS[selectedRoot]
 
       // 构建简化版 prompt - AI 只负责道号和评语
-      const prompt = `你是修仙世界的天道判官，负责为新入门修士评估性格并赐予道号。
-
+      const prompt =  `你是修仙世界的"天道判官",负责根据新入门修士的性格与灵根赐予【道号】与【评价】。
 【修士回答】
-第1题答案：${answers[0]}
-第2题答案：${answers[1]}
-第3题答案（开放题）：${answers[2]}
+第1题答案:${answers[0]}
+第2题答案:${answers[1]}
+第3题答案(开放题):${answers[2]}（开放性回答更能体现修士的内心）
 
-【性格分析】
+【性格】
 系统已量化分析修士性格：${personalityDesc}
 
 【已分配灵根】
-天道已定：${rootInfo.name}（${selectedRoot}）
+天道已定：${rootInfo.name}(${selectedRoot})
 灵根特征：${rootInfo.description}
 
 【你的任务】
-1. **道号（daoName）**：
-   - 2-4个汉字，深刻体现修士的性格特点
+1. **道号(daoName)**:
+   - 2-4个汉字,深刻体现修士的性格特点
    - 结合修士的回答和已分配的灵根
    - 避免使用常见俗套的名字
 
-2. **性格评语（personality）**：
-   - 50字以内，深入评价修士的性格和修仙潜力
+2. **性格评语(personality)**:
+   - 50字以内,深入评价修士的性格和修仙潜力
    - 结合三个问题的回答，全面分析
 
-3. **分配理由（reason）**：
-   - 50字以内，说明为什么赐予这个道号
-   - 解释道号如何与修士性格和灵根契合
+3. **天道反馈 (reason)**
+   - 根据“性格 + 道号 + 灵根 + 修士回答”生成一句庄重的天道宣言
+   - 模板结构必须包含：
+   - “经天鉴，该修士……”（严格的进行 正面或中性的描述，根据（修士回答）+（性格）来决定结果）注:正面或中性描述由修士回答的第3题决定
+   - “但........”（一句略带负面的描写，根据(修士回答的第3题)描写 注：仅当 第3题有内容过于敷衍,或存在作弊倾向时启用)
+   - “赐予道号『(daoName)』！”
+   - 末尾附上一小段带有修仙氛围的祝福，例如：
+       “愿道友.....。”（省略部分需 结合性格与灵根特性 编写）
+   - 全篇保持格局宏大、古风、庄重
 
-【重要提示】
-- **不要尝试修改或建议灵根**，灵根已由天道确定
-- 专注于生成有深度的道号和性格评语
-- 必须根据修士的真实回答进行分析
+【额外规则 · 必须遵守】
+- 不得修改灵根，不得提出灵根建议
+- 所有输出必须由修士的回答推导
+- 内容必须符合修仙世界观
+- 必须返回 **纯 JSON**，不得多字
 
-仅返回 JSON 对象，格式：
-{"daoName":"道号","personality":"性格评语","reason":"分配理由"}`
+【返回格式】
+{"daoName":"道号","personality":"性格评语","reason":"天道反馈"}`
 
       // 调用 AI 服务
       const response = await aiService.generate(prompt)
