@@ -456,6 +456,90 @@ koishi-plugin-xiuxian-txl/
 | count | unsigned | 分配次数 |
 | lastUpdateTime | timestamp | 最后更新时间 |
 
+## 开发工作流
+
+### 标准开发流程
+
+1. **编译插件**
+   ```bash
+   cd D:\项目\修仙2
+   npm run build
+   ```
+
+2. **部署到测试环境**
+   ```powershell
+   Copy-Item -Path 'D:\项目\修仙2\lib\*' -Destination 'C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\node_modules\koishi-plugin-xiuxian-txl\lib\' -Recurse -Force
+   ```
+
+3. **重启 Koishi**
+   - 在 Koishi 控制台中重启插件或重启整个实例
+
+4. **验证功能**
+   - 在 QQ 中测试修改的功能
+   - 查看 Koishi 日志确认无错误
+
+### 数据库迁移（如需要）
+
+当数据库表结构变更时：
+
+```bash
+# 删除旧表（谨慎操作）
+sqlite3 "C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\data\koishi.db" "DROP TABLE IF EXISTS xiuxian_player_v2; DROP TABLE IF EXISTS xiuxian_questioning_v2;"
+
+# 重启 Koishi 会自动创建新表
+```
+
+### 调试技巧
+
+**查看日志**：在 `koishi.yml` 中设置日志级别
+```yaml
+logLevel: 3  # 0=无, 1=error/success, 2=warning/info, 3=debug
+```
+
+**查看数据库**：
+```bash
+sqlite3 "C:\Users\TXL\AppData\Roaming\Koishi\Desktop\data\instances\default\data\koishi.db"
+.tables
+.schema xiuxian_player_v3
+SELECT * FROM xiuxian_player_v3;
+```
+
+## 常见问题排查
+
+### ChatLuna 相关
+
+**问题：ctx.chatluna 未注入**
+- 原因：插件加载顺序错误
+- 解决：在 `koishi.yml` 中确保 ChatLuna 在修仙插件之前
+- 参考：PROJECT_MEMORY.md "已修复问题 > v0.5.0 > ChatLuna未注入问题"
+
+**问题：AI 调用失败**
+- 检查 ChatLuna 配置是否正确
+- 检查 API Key 是否有效
+- 查看日志中的详细错误信息
+- 考虑开启 `enableFallback: true` 允许降级
+
+### 数据库相关
+
+**问题：unknown field "xxx" in model**
+- 原因：数据库表结构与代码不匹配
+- 解决：删除旧表，让 Koishi 重建
+- 参考：PROJECT_MEMORY.md "已修复问题 > v0.4.0 > 数据库架构不匹配"
+
+### 编译相关
+
+**问题：Module not found 错误**
+- 检查 `tsconfig.json` 中的 `moduleResolution` 设置
+- 确保使用 `"nodenext"` 而非 `"node"`
+- 参考：PROJECT_MEMORY.md "已修复问题 > v0.5.0 > 模块解析不兼容"
+
+### 游戏逻辑相关
+
+**问题：用户快速重复提交获得多倍奖励**
+- 原因：并发控制缺失
+- 已修复：v0.6.0 添加了 `isCompleting` 锁机制
+- 参考：PROJECT_MEMORY.md "已修复问题 > v0.6.0 > 会话重复完成漏洞"
+
 ## 开发指南
 
 ### 添加新命令
