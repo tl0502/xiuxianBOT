@@ -1,6 +1,7 @@
 import { Context } from 'koishi'
 import * as fs from 'fs'
 import * as path from 'path'
+import { KoishiAppContext } from '../adapters/koishi'
 import { QuestioningPath, PathPackageType, getRandomPath, getPathById as getPathByIdFromConfig, getPathsByPackageType } from '../config/questioning'
 import {
   QuestioningSession,
@@ -37,7 +38,9 @@ export class QuestioningService {
 
   constructor(private ctx: Context) {
     this.aiHelper = new AIHelper(ctx)
-    this.playerService = new PlayerService(ctx)
+    // 创建 AppContext 以传递给 PlayerService
+    const appContext = KoishiAppContext.from(ctx)
+    this.playerService = new PlayerService(appContext)
     this.rootStatsService = new RootStatsService(ctx)
     this.pathPackageService = new PathPackageService(ctx)
     this.hybridAnalyzer = new HybridPersonalityAnalyzer(ctx)

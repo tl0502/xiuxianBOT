@@ -1,4 +1,3 @@
-import { Context } from 'koishi'
 import { Player, CreatePlayerInput, PlayerDisplayInfo, ServiceResult } from '../types/player'
 import { REALMS, GameConfig, PlayerStatus } from '../config/constants'
 import {
@@ -11,19 +10,22 @@ import {
 } from '../utils/calculator'
 import { randomSuccess } from '../utils/random'
 import { formatDate } from '../utils/formatter'
+import { IAppContext } from '../adapters/interfaces'
 
 /**
  * 玩家服务类
+ *
+ * 注意：此服务已解耦 Koishi 框架，依赖 IAppContext 接口
  */
 export class PlayerService {
-  constructor(private ctx: Context) {}
+  constructor(private context: IAppContext) {}
 
   /**
    * 获取玩家信息
    */
   async getPlayer(userId: string): Promise<Player | null> {
-    const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
-    return player || null
+    const players = await this.context.database.get<Player>('xiuxian_player_v3', { userId })
+    return players[0] || null
   }
 
   /**
@@ -50,7 +52,7 @@ export class PlayerService {
     // 创建玩家（使用 AI 分配的道号和灵根）
     let player: Player
     try {
-      player = await this.ctx.database.create('xiuxian_player_v3', {
+      player = await this.context.database.create('xiuxian_player_v3', {
         userId: input.userId,
         username: input.username,  // AI 分配的道号
         spiritualRoot: input.spiritualRoot,  // 当前灵根（可升级）
@@ -80,13 +82,13 @@ export class PlayerService {
         }
       }
       // 其他错误向上抛出通用提示
-      this.ctx.logger('xiuxian').error('创建玩家失败:', err)
+      this.context.logger.error('创建玩家失败:', err)
       return { success: false, message: '创建玩家失败，请稍后再试' }
     }
 
     // 计算初始战力
     const combatPower = calculateCombatPower(player)
-    await this.ctx.database.set('xiuxian_player_v3', { userId: input.userId }, {
+    await this.context.database.set<Player>('xiuxian_player_v3', { userId: input.userId }, {
       combatPower
     })
 
@@ -147,7 +149,7 @@ export class PlayerService {
     const speed = calculateCultivationSpeed(player)
     const endTime = new Date(Date.now() + hours * 60 * 60 * 1000)
 
-    await this.ctx.database.set('xiuxian_player_v3', { userId }, {
+    await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
       status: PlayerStatus.CULTIVATING,
       statusEndTime: endTime,
       lastActiveTime: new Date()
@@ -184,7 +186,7 @@ export class PlayerService {
     const newCultivation = Math.min(player.cultivation + gained, player.cultivationMax)
 
     // 更新数据
-    await this.ctx.database.set('xiuxian_player_v3', { userId }, {
+    await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
       cultivation: newCultivation,
       status: PlayerStatus.IDLE,
       statusEndTime: null,
@@ -241,7 +243,7 @@ export class PlayerService {
       const newCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
       const newCombatPower = calculateCombatPower({ ...player, realm: newRealm, realmLevel: newRealmLevel })
 
-      await this.ctx.database.set('xiuxian_player_v3', { userId }, {
+      await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
         realm: newRealm,
         realmLevel: newRealmLevel,
         cultivation: 0,
@@ -261,7 +263,7 @@ export class PlayerService {
       }
     } else {
       // 突破失败，修为清空
-      await this.ctx.database.set('xiuxian_player_v3', { userId }, {
+      await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
         cultivation: 0,
         lastActiveTime: new Date()
       })
