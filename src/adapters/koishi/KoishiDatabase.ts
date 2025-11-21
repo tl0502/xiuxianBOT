@@ -49,30 +49,21 @@ export class KoishiDatabase implements IDatabase {
     table: string,
     query: Partial<T> | ((row: T) => boolean),
     updates: Partial<T>
-  ): Promise<T[]> {
-    // Koishi 的 set 返回 void，我们需要先更新再查询
+  ): Promise<void> {
+    // Koishi 的 set 返回 void
     if (typeof query === 'function') {
       // 函数查询：先找到记录，然后逐个更新
       const all = await this.ctx.database.get(table as any, {})
       const toUpdate = all.filter(query as any)
 
-      if (toUpdate.length === 0) return []
-
       // 逐个更新
       for (const row of toUpdate) {
         await this.ctx.database.set(table as any, { id: (row as any).id }, updates as any)
       }
-
-      // 重新查询
-      const ids = toUpdate.map((r: any) => r.id)
-      return this.ctx.database.get(table as any, { id: { $in: ids } } as any) as Promise<T[]>
+    } else {
+      // 直接更新
+      await this.ctx.database.set(table as any, query as any, updates as any)
     }
-
-    // 直接更新
-    await this.ctx.database.set(table as any, query as any, updates as any)
-
-    // 重新查询返回更新后的记录
-    return this.ctx.database.get(table as any, query as any) as Promise<T[]>
   }
 
   async remove<T = any>(

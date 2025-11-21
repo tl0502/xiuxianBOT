@@ -11,10 +11,12 @@ export class KoishiAppContext implements IAppContext {
   public readonly database: KoishiDatabase
   public readonly logger: KoishiLogger
   public readonly ai?: IAIService
+  public readonly config?: any
 
   constructor(ctx: Context, namespace: string = 'xiuxian') {
     this.database = new KoishiDatabase(ctx)
     this.logger = new KoishiLogger(ctx, namespace)
+    this.config = ctx.config
 
     // AI 服务（如果存在）
     if (ctx.xiuxianAI) {

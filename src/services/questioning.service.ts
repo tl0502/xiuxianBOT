@@ -1,6 +1,7 @@
 import { Context } from 'koishi'
 import * as fs from 'fs'
 import * as path from 'path'
+import { IAppContext } from '../adapters/interfaces'
 import { KoishiAppContext } from '../adapters/koishi'
 import { QuestioningPath, PathPackageType, getRandomPath, getPathById as getPathByIdFromConfig, getPathsByPackageType } from '../config/questioning'
 import {
@@ -26,9 +27,14 @@ import { HybridPersonalityAnalyzer } from '../utils/hybrid-personality-analyzer'
 
 /**
  * 问心服务类
+ *
+ * 注意：此服务部分解耦 Koishi 框架
+ * - 数据库、日志、配置访问通过 IAppContext
+ * - AIHelper、HybridAnalyzer 暂时保留 Context 依赖（待后续解耦）
  */
 export class QuestioningService {
   private sessions: Map<string, QuestioningSession> = new Map()
+  private context: IAppContext
   private aiHelper: AIHelper
   private playerService: PlayerService
   private rootStatsService: RootStatsService
@@ -37,24 +43,25 @@ export class QuestioningService {
   private cleanupInterval: NodeJS.Timeout
 
   constructor(private ctx: Context) {
+    // 创建 Adapter 上下文
+    this.context = KoishiAppContext.from(ctx)
+
     this.aiHelper = new AIHelper(ctx)
-    // 创建 AppContext 以传递给 PlayerService
-    const appContext = KoishiAppContext.from(ctx)
-    this.playerService = new PlayerService(appContext)
-    this.rootStatsService = new RootStatsService(ctx)
-    this.pathPackageService = new PathPackageService(ctx)
+    this.playerService = new PlayerService(this.context)
+    this.rootStatsService = new RootStatsService(this.context)
+    this.pathPackageService = new PathPackageService(this.context)
     this.hybridAnalyzer = new HybridPersonalityAnalyzer(ctx)
 
     // 注册所有问道包
     this.pathPackageService.registerAll(ALL_PATH_PACKAGES)
-    ctx.logger('xiuxian').info(`已注册 ${ALL_PATH_PACKAGES.length} 个问道包`)
+    this.context.logger.info(`已注册 ${ALL_PATH_PACKAGES.length} 个问道包`)
 
     // 启动定期清理任务（每5分钟清理一次过期session）
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredSessions()
     }, 5 * 60 * 1000)
 
-    ctx.logger('xiuxian').info('问心服务已启动，session自动清理已启用')
+    this.context.logger.info('问心服务已启动，session自动清理已启用')
   }
 
   /**
@@ -72,12 +79,12 @@ export class QuestioningService {
       if (now - lastTime > timeout) {
         this.sessions.delete(userId)
         cleanedCount++
-        this.ctx.logger('xiuxian').debug(`清理过期session: ${userId}`)
+        this.context.logger.debug(`清理过期session: ${userId}`)
       }
     }
 
     if (cleanedCount > 0) {
-      this.ctx.logger('xiuxian').info(`已清理 ${cleanedCount} 个过期session，当前活跃session数: ${this.sessions.size}`)
+      this.context.logger.info(`已清理 ${cleanedCount} 个过期session，当前活跃session数: ${this.sessions.size}`)
     }
   }
 
@@ -87,7 +94,7 @@ export class QuestioningService {
   dispose(): void {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval)
-      this.ctx.logger('xiuxian').info('问心服务已停止，session清理任务已取消')
+      this.context.logger.info('问心服务已停止，session清理任务已取消')
     }
     this.sessions.clear()
   }
@@ -104,7 +111,7 @@ export class QuestioningService {
         }
       }
     } catch (e) {
-      this.ctx.logger('xiuxian').warn('读取 src/config/timeout.json 失败，使用默认超时 60s')
+      this.context.logger.warn('读取 src/config/timeout.json 失败，使用默认超时 60s')
     }
     return 60
   }
@@ -140,10 +147,10 @@ export class QuestioningService {
     }
 
     // 查询最近一次该路径的问心记录
-    const records = await this.ctx.database.get('xiuxian_questioning_v3', {
+    const records = await this.context.database.get<any>('xiuxian_questioning_v3', {
       userId,
       pathId
-    }, {
+    } as any, {
       sort: { createTime: 'desc' },
       limit: 1
     })
@@ -240,7 +247,7 @@ export class QuestioningService {
         // 试炼问心：惩罚（例如扣除灵石）并记录
         const penalty = detect.severity === 'high' ? -200 : -100
         try {
-          await this.ctx.database.create('xiuxian_questioning_v3', {
+          await this.context.database.create('xiuxian_questioning_v3', {
             userId,
             pathId: path.id,
             pathName: path.name,
@@ -275,7 +282,7 @@ export class QuestioningService {
       // ✨ submitAnswer现在仅用于步入仙途注册流程
       // 如果pathId不是INITIATION类型，说明路由错误
       if (path.packageType !== PathPackageType.INITIATION) {
-        this.ctx.logger('xiuxian').error(`路由错误：非INITIATION包${path.id}错误进入submitAnswer，应走submitPackageAnswer`)
+        this.context.logger.error(`路由错误：非INITIATION包${path.id}错误进入submitAnswer，应走submitPackageAnswer`)
         this.sessions.delete(userId)
         return { success: false, message: '系统错误：路径类型不匹配' }
       }
@@ -309,28 +316,28 @@ export class QuestioningService {
    * 应用奖励
    */
   private async applyReward(userId: string, type: string, value: number): Promise<void> {
-    const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
+    const [player] = await this.context.database.get<any>('xiuxian_player_v3', { userId } as any)
     if (!player) return
 
     switch (type) {
       case 'cultivation':
         // 增减修为，范围 [0, 上限]
         const newCultivation = Math.max(0, Math.min(player.cultivation + value, player.cultivationMax))
-        await this.ctx.database.set('xiuxian_player_v3', { userId }, {
+        await this.context.database.set<any>('xiuxian_player_v3', { userId } as any, {
           cultivation: newCultivation
-        })
+        } as any)
         break
 
       case 'spiritStone':
         // 增减灵石（下限 0）
         const newStone = Math.max(0, player.spiritStone + value)
-        await this.ctx.database.set('xiuxian_player_v3', { userId }, { spiritStone: newStone })
+        await this.context.database.set<any>('xiuxian_player_v3', { userId } as any, { spiritStone: newStone } as any)
         break
 
       case 'breakthrough':
         // breakthrough 类型的奖励是临时的成功率加成，这里可以存储到玩家的某个字段
         // 暂时不处理，或者可以添加一个 breakthroughBonus 字段
-        this.ctx.logger('xiuxian').info(`${userId} 获得突破成功率加成: ${value}`)
+        this.context.logger.info(`${userId} 获得突破成功率加成: ${value}`)
         break
     }
   }
@@ -489,18 +496,18 @@ export class QuestioningService {
     path: QuestioningPath
   ): Promise<ServiceResult<InitiationCompleteData>> {
     try {
-      this.ctx.logger('xiuxian').info('=== 步入仙途完成流程开始 ===')
+      this.context.logger.info('=== 步入仙途完成流程开始 ===')
 
       // 提取答案（选择题用字母，开放题用文本）
       const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.letter))
-      this.ctx.logger('xiuxian').debug('用户答案:', answersText)
+      this.context.logger.debug('用户答案:', answersText)
 
       // ✨ v0.7.0: 读取配置项
-      const config = this.ctx.config as any
+      const config = this.context.config as any
       const enableAI = config?.enableInitiationAIScoring ?? true
       const enableFallback = config?.enableInitiationAIScoringFallback ?? true
 
-      this.ctx.logger('xiuxian').info(`INITIATION AI评分配置: enableAI=${enableAI}, enableFallback=${enableFallback}`)
+      this.context.logger.info(`INITIATION AI评分配置: enableAI=${enableAI}, enableFallback=${enableFallback}`)
 
       // ✨ v0.7.0: 使用混合分析器分析性格
       const analysisResult = await this.hybridAnalyzer.analyzeInitiation(
@@ -510,8 +517,8 @@ export class QuestioningService {
       )
 
       const personalityScore = analysisResult.finalScore
-      this.ctx.logger('xiuxian').info(`性格分析完成，使用${analysisResult.usedAI ? 'AI' : '关键词'}评分`)
-      this.ctx.logger('xiuxian').debug('性格分数:', JSON.stringify(personalityScore))
+      this.context.logger.info(`性格分析完成，使用${analysisResult.usedAI ? 'AI' : '关键词'}评分`)
+      this.context.logger.debug('性格分数:', JSON.stringify(personalityScore))
 
       // 调用 AI Helper 生成初始响应（包含灵根分配和道号生成）
       // 注意：generateInitiationResponse 内部会再次调用 analyzePersonality，
@@ -539,14 +546,14 @@ export class QuestioningService {
       // 【重要】增加初始灵根统计计数（公平性系统）
       try {
         await this.rootStatsService.incrementRootCount(aiResponse.spiritualRoot as SpiritualRootType)
-        this.ctx.logger('xiuxian').info(`统计已更新：${aiResponse.spiritualRoot} 数量 +1`)
+        this.context.logger.info(`统计已更新：${aiResponse.spiritualRoot} 数量 +1`)
       } catch (error) {
-        this.ctx.logger('xiuxian').error('更新初始灵根统计失败:', error)
+        this.context.logger.error('更新初始灵根统计失败:', error)
         // 不影响主流程，继续
       }
 
       // 保存问心记录到数据库（包含混合分析结果）
-      await this.ctx.database.create('xiuxian_questioning_v3', {
+      await this.context.database.create('xiuxian_questioning_v3', {
         userId,
         pathId: path.id,
         pathName: path.name,
@@ -575,7 +582,7 @@ export class QuestioningService {
       // 清除会话
       this.sessions.delete(userId)
 
-      this.ctx.logger('xiuxian').info('=== 步入仙途完成流程结束 ===')
+      this.context.logger.info('=== 步入仙途完成流程结束 ===')
 
       // 返回结果
       return {
@@ -590,7 +597,7 @@ export class QuestioningService {
         }
       }
     } catch (error) {
-      this.ctx.logger('xiuxian').error('步入仙途问心完成流程错误:', error)
+      this.context.logger.error('步入仙途问心完成流程错误:', error)
       this.sessions.delete(userId)
       return { success: false, message: '问心评估失败，请稍后重试' }
     }
@@ -627,9 +634,9 @@ export class QuestioningService {
    */
   async getHistory(userId: string, limit: number = 5): Promise<ServiceResult<QuestioningRecord[]>> {
     try {
-      const records = await this.ctx.database.get('xiuxian_questioning_v3', {
+      const records = await this.context.database.get<any>('xiuxian_questioning_v3', {
         userId
-      }, {
+      } as any, {
         sort: { createTime: 'desc' },
         limit
       })
@@ -637,10 +644,10 @@ export class QuestioningService {
       return {
         success: true,
         message: '查询成功',
-        data: records
+        data: records as QuestioningRecord[]
       }
     } catch (error) {
-      this.ctx.logger('xiuxian').error('查询问心历史失败:', error)
+      this.context.logger.error('查询问心历史失败:', error)
       return { success: false, message: '查询失败' }
     }
   }
@@ -777,7 +784,7 @@ export class QuestioningService {
   ): Promise<ServiceResult<PackageExecutionResult>> {
     try {
       // 获取玩家信息
-      const [player] = await this.ctx.database.get('xiuxian_player_v3', { userId })
+      const [player] = await this.context.database.get<any>('xiuxian_player_v3', { userId } as any)
       if (!player) {
         this.sessions.delete(userId)
         return { success: false, message: '玩家信息不存在' }
@@ -827,7 +834,7 @@ export class QuestioningService {
       await this.applyReward(userId, reward.type, reward.value)
 
       // 保存记录到数据库
-      await this.ctx.database.create('xiuxian_questioning_v3', {
+      await this.context.database.create('xiuxian_questioning_v3', {
         userId,
         pathId: pkg.id,
         pathName: pkg.name,
@@ -875,7 +882,7 @@ export class QuestioningService {
         data: result
       }
     } catch (error) {
-      this.ctx.logger('xiuxian').error('完成问道包流程错误:', error)
+      this.context.logger.error('完成问道包流程错误:', error)
       this.sessions.delete(userId)
 
       // ✨ 如果是AI相关错误，给出更明确的提示
@@ -892,7 +899,7 @@ export class QuestioningService {
    * 获取AI评分降级配置
    */
   private getAIScoringFallbackEnabled(): boolean {
-    const config = this.ctx.config as any
+    const config = this.context.config as any
     return config?.enableAIScoringFallback ?? false
   }
 
@@ -913,15 +920,15 @@ export class QuestioningService {
         const prompt = this.buildPackageEvaluationPrompt(pkg, answers, personalityScore, matchResult, aiReasoning)
 
         // ✨ 调试：记录prompt长度
-        this.ctx.logger('xiuxian').debug(`AI评语prompt长度: ${prompt.length} 字符`)
-        this.ctx.logger('xiuxian').debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
+        this.context.logger.debug(`AI评语prompt长度: ${prompt.length} 字符`)
+        this.context.logger.debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
 
         const response = await aiService.generate(prompt)
 
         // 检查响应是否为 null
         if (response) {
           // ✨ 调试：记录原始响应
-          this.ctx.logger('xiuxian').debug(`AI评语原始响应: ${response}`)
+          this.context.logger.debug(`AI评语原始响应: ${response}`)
 
           // ✨ 增强JSON提取：容忍AI在JSON前后添加说明文字
           let jsonText = response.trim()
@@ -930,7 +937,7 @@ export class QuestioningService {
           const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
           if (jsonMatch) {
             jsonText = jsonMatch[0]
-            this.ctx.logger('xiuxian').debug(`提取的JSON: ${jsonText}`)
+            this.context.logger.debug(`提取的JSON: ${jsonText}`)
           }
 
           // 解析响应
@@ -940,14 +947,14 @@ export class QuestioningService {
             rewardReason: parsed.rewardReason || '完成问道'
           }
         } else {
-          this.ctx.logger('xiuxian').warn('AI评语响应为null')
+          this.context.logger.warn('AI评语响应为null')
         }
       } catch (error) {
-        this.ctx.logger('xiuxian').warn('AI评语生成失败，使用默认评语')
-        this.ctx.logger('xiuxian').debug('AI评语生成错误详情:', error)
+        this.context.logger.warn('AI评语生成失败，使用默认评语')
+        this.context.logger.debug('AI评语生成错误详情:', error)
         // ✨ 如果是JSON解析错误，显示错误信息和原始响应
         if (error instanceof SyntaxError) {
-          this.ctx.logger('xiuxian').warn(`JSON解析失败: ${error.message}`)
+          this.context.logger.warn(`JSON解析失败: ${error.message}`)
         }
       }
     }

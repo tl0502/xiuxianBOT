@@ -1,12 +1,14 @@
-import { Context } from 'koishi'
+import { IAppContext } from '../adapters/interfaces'
 import { FATE_DISTRIBUTION } from '../config/fate-distribution'
 import { SpiritualRootType } from '../config/spiritual-roots'
 
 /**
  * 初始灵根统计服务
+ *
+ * 注意：此服务已解耦 Koishi 框架，依赖 IAppContext 接口
  */
 export class RootStatsService {
-  constructor(private ctx: Context) {}
+  constructor(private context: IAppContext) {}
 
   /**
    * 初始化统计表（如果不存在）
@@ -24,12 +26,12 @@ export class RootStatsService {
     }
 
     for (const rootType of allRoots) {
-      const existing = await this.ctx.database.get('xiuxian_initial_root_stats', {
+      const existing = await this.context.database.get('xiuxian_initial_root_stats', {
         rootType
       })
 
       if (existing.length === 0) {
-        await this.ctx.database.create('xiuxian_initial_root_stats', {
+        await this.context.database.create('xiuxian_initial_root_stats', {
           rootType,
           count: 0,
           lastUpdated: new Date()
@@ -42,25 +44,25 @@ export class RootStatsService {
    * 增加灵根分配计数
    */
   async incrementRootCount(rootType: SpiritualRootType): Promise<void> {
-    const stats = await this.ctx.database.get('xiuxian_initial_root_stats', {
+    const stats = await this.context.database.get<any>('xiuxian_initial_root_stats', {
       rootType
     })
 
     if (stats.length === 0) {
       // 不存在，创建新记录
-      await this.ctx.database.create('xiuxian_initial_root_stats', {
+      await this.context.database.create('xiuxian_initial_root_stats', {
         rootType,
         count: 1,
         lastUpdated: new Date()
       })
     } else {
       // 存在，增加计数
-      await this.ctx.database.set('xiuxian_initial_root_stats', {
+      await this.context.database.set<any>('xiuxian_initial_root_stats', {
         rootType
-      }, {
+      } as any, {
         count: stats[0].count + 1,
         lastUpdated: new Date()
-      })
+      } as any)
     }
   }
 
@@ -68,7 +70,7 @@ export class RootStatsService {
    * 获取所有灵根的统计信息
    */
   async getAllStats(): Promise<Map<SpiritualRootType, number>> {
-    const stats = await this.ctx.database.get('xiuxian_initial_root_stats', {})
+    const stats = await this.context.database.get('xiuxian_initial_root_stats', {})
 
     const result = new Map<SpiritualRootType, number>()
     for (const stat of stats) {
@@ -82,7 +84,7 @@ export class RootStatsService {
    * 获取总玩家数量
    */
   async getTotalPlayerCount(): Promise<number> {
-    const players = await this.ctx.database.get('xiuxian_player_v3', {})
+    const players = await this.context.database.get('xiuxian_player_v3', {})
     return players.length
   }
 
