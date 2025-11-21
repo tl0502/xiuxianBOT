@@ -17,7 +17,7 @@ export function registerQuestioningCommands(
   /**
    * 问心列表（仅显示信息，实际使用时会随机选择）
    */
-  ctx.command('问心列表', '查看可用的问心路径')
+  ctx.command('修仙.问心列表', '查看可用的问心路径')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -75,7 +75,7 @@ export function registerQuestioningCommands(
   /**
    * 开始问心（随机选择路径）
    */
-  ctx.command('问心', '进行问心试炼（随机路径）')
+  ctx.command('修仙.问心', '进行问心试炼（随机路径）')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -131,7 +131,7 @@ export function registerQuestioningCommands(
   /**
    * 取消问心
    */
-  ctx.command('取消问心', '取消当前的问心')
+  ctx.command('修仙.取消问心', '取消当前的问心')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -144,7 +144,7 @@ export function registerQuestioningCommands(
   /**
    * 问心历史
    */
-  ctx.command('问心历史', '查看问心历史记录')
+  ctx.command('修仙.问心历史', '查看问心历史记录')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 

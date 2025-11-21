@@ -29,6 +29,8 @@ export interface Config {
   // 步入仙途AI生成（v0.8.2 新增）
   enableInitiationAIResponse?: boolean
   enableInitiationAIResponseFallback?: boolean
+  // 开发者工具
+  enableDevTools?: boolean
 }
 
 export const Config: Schema<Config> = Schema.intersect([
@@ -93,7 +95,14 @@ export const Config: Schema<Config> = Schema.intersect([
     fallbackToV1: Schema.boolean()
       .default(true)
       .description('v2.0 失败时降级到 v1.0（v2.0 专用，当前无效）')
-  }).description('⚙️ 性格量化系统（高级 | 保持默认即可）')
+  }).description('⚙️ 性格量化系统（高级 | 保持默认即可）'),
+
+  // ========== 开发者工具 ==========
+  Schema.object({
+    enableDevTools: Schema.boolean()
+      .default(false)
+      .description('🔧 启用开发者测试命令 | 用于测试灵根分布、清理数据等')
+  }).description('🛠️ 开发者工具（仅供测试）')
 ])
 
 export function apply(ctx: Context, config: Config) {

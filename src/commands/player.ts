@@ -16,7 +16,7 @@ export function registerPlayerCommands(
    * 命令：步入仙途
    * 功能：触发问心流程，由 AI 分配道号和灵根
    */
-  ctx.command('步入仙途', '踏入修仙世界，开启仙途之旅')
+  ctx.command('修仙.步入仙途', '踏入修仙世界，开启仙途之旅')
     .action(async ({ session }) => {
       if (!session?.userId) return Messages.NO_SESSION
 
@@ -62,7 +62,7 @@ export function registerPlayerCommands(
    * 命令：天道记录
    * 功能：查看玩家个人信息
    */
-  ctx.command('天道记录', '查看你的修仙信息')
+  ctx.command('修仙.天道记录', '查看你的修仙信息')
     .action(async ({ session }) => {
       if (!session?.userId) return Messages.NO_SESSION
 
