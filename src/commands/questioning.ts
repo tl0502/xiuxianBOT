@@ -313,15 +313,13 @@ export function registerQuestioningCommands(
 
         let message = '\n\n━━━━ 踏入仙途 ━━━━\n\n'
         message += `✨ 恭喜你踏入修仙世界！\n\n`
-        message += `🎭 天道评语：\n${data.personality}\n\n`
-        message += `📜 分配依据：\n${data.reason}\n\n`
+       // message += `🎭 天道评语：\n${data.personality}\n\n`
+        message += `📜 天道反馈：\n${data.reason}\n\n`
         message += `━━━━ 你的信息 ━━━━\n\n`
         message += `👤 道号：${data.daoName}\n`
         message += `🌟 灵根：${spiritualRootInfo.name}\n`
         message += `   ${spiritualRootInfo.description}\n\n`
-        message += `愿你在这修仙世界中破开虚妄，证得大道！\n\n`
         message += `💡 使用 天道记录 查看完整信息\n\n`
-        message += `━━━━━━━━━━━━━━`
 
         return h('', [
           h('at', { id: session.userId }),

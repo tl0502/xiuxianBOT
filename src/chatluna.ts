@@ -7,14 +7,11 @@ import { ComputedRef } from '@vue/reactivity'
 
 export interface Config {
   model: string
-  enableFallback: boolean
+  // 注意：enableFallback 已移至主配置的步入仙途区块
 }
 
 export const Config: Schema<Config> = Schema.object({
-  model: Schema.dynamic('model').description('AI 模型（用于问心系统）'),
-  enableFallback: Schema.boolean()
-    .default(false)
-    .description('AI 失败时是否自动使用模拟响应（禁用可防止作弊，但 AI 故障时功能不可用）')
+  model: Schema.dynamic('model').description('AI 模型（全局，用于所有AI功能）'),
 })
 
 /**
@@ -77,9 +74,12 @@ export class XiuxianAIService extends Service {
 
   /**
    * 检查是否允许降级到模拟响应
+   * 注意：从主配置的 enableInitiationAIResponseFallback 读取
    */
   isFallbackEnabled(): boolean {
-    return this.config.enableFallback
+    // 从父级配置读取步入仙途的降级开关
+    const parentConfig = (this.ctx as any).config
+    return parentConfig?.enableInitiationAIResponseFallback ?? false
   }
 }
 

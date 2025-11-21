@@ -21,7 +21,7 @@ import { RootStatsService } from './root-stats.service'
 import { SpiritualRootType } from '../config/spiritual-roots'
 import { PathPackageService } from './path-package.service'
 import { PathPackageTemplate, PathPackageTag, PackageExecutionResult, MatchResult } from '../types/path-package'
-import { calculateMatchResult, generateMatchDescription, generateSimilarityAnalysis } from '../utils/score-matcher'
+import { calculateMatchResult, generateSimilarityAnalysis } from '../utils/score-matcher'
 import { ALL_PATH_PACKAGES } from '../config/path-packages/index'
 import { HybridPersonalityAnalyzer } from '../utils/hybrid-personality-analyzer'
 
@@ -793,17 +793,23 @@ export class QuestioningService {
       // 提取答案（选择题用字母，开放题用文本）
       const answersText = session.answers.map(a => (typeof a === 'string' ? a : a.letter))
 
+      // ✨ v0.8.2 使用优先级控制逻辑
+      const enableAIScoring = this.shouldEnableAIScoring(pkg)
+      const enableAIScoringFallback = this.getAIScoringFallbackEnabled()
+      const enableAIEvaluation = this.shouldEnableAIEvaluation(pkg)
+
       // ✨ v0.6.0 使用混合分析器（选择题规则 + AI评估开放题）
       const analysisResult = await this.hybridAnalyzer.analyze(
         answersText,
         pkg.questions,
         {
-          requiresAI: pkg.requiresAI ?? false,
-          enableFallback: this.getAIScoringFallbackEnabled(),
+          requiresAI: enableAIScoring,  // ✨ 使用优先级控制结果
+          enableFallback: enableAIScoringFallback,
           maxScorePerDimension: pkg.aiScoringConfig?.maxScorePerDimension,
           minScorePerDimension: pkg.aiScoringConfig?.minScorePerDimension,
           openQuestionIndices: pkg.aiScoringConfig?.openQuestionIndices
-        }
+        },
+        pkg.scoringWeights  // ✨ v0.8.2 传递权重配置
       )
 
       const personalityScore = analysisResult.finalScore
@@ -821,14 +827,21 @@ export class QuestioningService {
         }
       }
 
-      // 生成AI评语（可以使用AI的reasoning）
-      const aiEvaluation = await this.generatePackageEvaluation(
-        pkg,
-        answersText,
-        personalityScore,
-        matchResult,
-        analysisResult.aiReasoning
-      )
+      // ✨ v0.8.2 生成AI评语（独立控制）
+      let aiEvaluation: { evaluation: string; rewardReason: string }
+      if (enableAIEvaluation) {
+        aiEvaluation = await this.generatePackageEvaluation(
+          pkg,
+          answersText,
+          personalityScore,
+          matchResult,
+          analysisResult.aiReasoning
+        )
+      } else {
+        // 使用降级评语
+        this.context.logger.info('AI评语被禁用，使用降级评语')
+        aiEvaluation = this.getFallbackEvaluation(pkg, matchResult)
+      }
 
       // 应用奖励
       await this.applyReward(userId, reward.type, reward.value)
@@ -904,7 +917,118 @@ export class QuestioningService {
   }
 
   /**
+   * 判断是否启用AI打分（全局配置 > 包内配置）
+   * v0.8.2 新增：实现配置优先级控制
+   *
+   * 优先级：
+   * 1. 全局强制禁用（enableAIScoring = 'off'）→ false
+   * 2. 全局强制启用（enableAIScoring = 'on'）→ true
+   * 3. 全局默认（enableAIScoring = 'auto' 或 undefined）→ 使用包内配置
+   */
+  private shouldEnableAIScoring(pkg: PathPackageTemplate): boolean {
+    const config = this.context.config as any
+
+    // 全局强制禁用
+    if (config?.enableAIScoring === 'off') {
+      this.context.logger.debug(`AI打分：全局强制禁用（包${pkg.id}）`)
+      return false
+    }
+
+    // 全局强制启用
+    if (config?.enableAIScoring === 'on') {
+      this.context.logger.debug(`AI打分：全局强制启用（包${pkg.id}）`)
+      return true
+    }
+
+    // 全局默认（'auto' 或 undefined），使用包内配置
+    if (pkg.aiFeatures) {
+      this.context.logger.debug(`AI打分：使用包内配置 enableScoring=${pkg.aiFeatures.enableScoring}（包${pkg.id}）`)
+      return pkg.aiFeatures.enableScoring
+    }
+
+    // 向后兼容：使用旧的 requiresAI
+    const result = pkg.requiresAI ?? false
+    this.context.logger.debug(`AI打分：使用旧配置 requiresAI=${result}（包${pkg.id}）`)
+    return result
+  }
+
+  /**
+   * 判断是否启用AI评语（全局配置 > 包内配置）
+   * v0.8.2 新增：独立控制AI评语开关
+   *
+   * 优先级：
+   * 1. 全局强制禁用（enableAIEvaluation = 'off'）→ false
+   * 2. 全局强制启用（enableAIEvaluation = 'on'）→ true
+   * 3. 全局默认（enableAIEvaluation = 'auto' 或 undefined）→ 使用包内配置
+   */
+  private shouldEnableAIEvaluation(pkg: PathPackageTemplate): boolean {
+    const config = this.context.config as any
+
+    // 全局强制禁用
+    if (config?.enableAIEvaluation === 'off') {
+      this.context.logger.debug(`AI评语：全局强制禁用（包${pkg.id}）`)
+      return false
+    }
+
+    // 全局强制启用
+    if (config?.enableAIEvaluation === 'on') {
+      this.context.logger.debug(`AI评语：全局强制启用（包${pkg.id}）`)
+      return true
+    }
+
+    // 全局默认（'auto' 或 undefined），使用包内配置
+    if (pkg.aiFeatures) {
+      this.context.logger.debug(`AI评语：使用包内配置 enableEvaluation=${pkg.aiFeatures.enableEvaluation}（包${pkg.id}）`)
+      return pkg.aiFeatures.enableEvaluation
+    }
+
+    // 向后兼容：使用旧的 requiresAI
+    const result = pkg.requiresAI ?? false
+    this.context.logger.debug(`AI评语：使用旧配置 requiresAI=${result}（包${pkg.id}）`)
+    return result
+  }
+
+  /**
+   * 获取AI评语降级配置
+   * v0.8.2 新增：独立的评语降级开关
+   */
+  private getAIEvaluationFallbackEnabled(): boolean {
+    const config = this.context.config as any
+    return config?.enableAIEvaluationFallback ?? true
+  }
+
+  /**
+   * 获取降级评语（当AI评语被禁用或失败时）
+   * v0.8.2 新增：模板评语降级方案
+   */
+  private getFallbackEvaluation(
+    pkg: PathPackageTemplate,
+    matchResult?: MatchResult
+  ): { evaluation: string; rewardReason: string } {
+    const tier = matchResult?.tier ?? 'normal'
+
+    // 根据匹配度等级生成评语
+    let evaluation = ''
+    if (tier === 'perfect') {
+      evaluation = `你完美地完成了${pkg.name}的考验，展现出卓越的智慧与品德。`
+    } else if (tier === 'good') {
+      evaluation = `你成功通过了${pkg.name}的考验，表现良好，仍有进步空间。`
+    } else {
+      evaluation = `你经历了${pkg.name}的考验，虽未达最佳，但也有所收获。`
+    }
+
+    // 使用奖励配置中的提示作为原因
+    const rewardReason = matchResult?.reward.aiPromptHint ?? '历练有所收获，继续努力修行。'
+
+    return {
+      evaluation,
+      rewardReason
+    }
+  }
+
+  /**
    * 生成问道包的AI评语
+   * v0.8.2 更新：支持降级配置控制
    */
   private async generatePackageEvaluation(
     pkg: PathPackageTemplate,
@@ -913,65 +1037,64 @@ export class QuestioningService {
     matchResult?: MatchResult,
     aiReasoning?: string
   ): Promise<{ evaluation: string; rewardReason: string }> {
-    // 如果AI服务可用，调用AI生成评语
+    const enableFallback = this.getAIEvaluationFallbackEnabled()
+
+    // 检查AI服务是否可用
     const aiService = this.ctx.xiuxianAI
-    if (aiService && aiService.isAvailable()) {
-      try {
-        const prompt = this.buildPackageEvaluationPrompt(pkg, answers, personalityScore, matchResult, aiReasoning)
-
-        // ✨ 调试：记录prompt长度
-        this.context.logger.debug(`AI评语prompt长度: ${prompt.length} 字符`)
-        this.context.logger.debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
-
-        const response = await aiService.generate(prompt)
-
-        // 检查响应是否为 null
-        if (response) {
-          // ✨ 调试：记录原始响应
-          this.context.logger.debug(`AI评语原始响应: ${response}`)
-
-          // ✨ 增强JSON提取：容忍AI在JSON前后添加说明文字
-          let jsonText = response.trim()
-
-          // 尝试提取JSON（查找第一个{到最后一个}）
-          const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
-          if (jsonMatch) {
-            jsonText = jsonMatch[0]
-            this.context.logger.debug(`提取的JSON: ${jsonText}`)
-          }
-
-          // 解析响应
-          const parsed = JSON.parse(jsonText)
-          return {
-            evaluation: parsed.evaluation || '问道完成',
-            rewardReason: parsed.rewardReason || '完成问道'
-          }
-        } else {
-          this.context.logger.warn('AI评语响应为null')
-        }
-      } catch (error) {
-        this.context.logger.warn('AI评语生成失败，使用默认评语')
-        this.context.logger.debug('AI评语生成错误详情:', error)
-        // ✨ 如果是JSON解析错误，显示错误信息和原始响应
-        if (error instanceof SyntaxError) {
-          this.context.logger.warn(`JSON解析失败: ${error.message}`)
-        }
+    if (!aiService || !aiService.isAvailable()) {
+      if (enableFallback) {
+        this.context.logger.warn('AI服务不可用，使用降级评语')
+        return this.getFallbackEvaluation(pkg, matchResult)
+      } else {
+        throw new Error('AI服务不可用，且未启用降级')
       }
     }
 
-    // 降级方案：根据匹配结果生成默认评语
-    if (matchResult) {
-      const tierDesc = generateMatchDescription(matchResult)
-      const hint = matchResult.reward.aiPromptHint || '问道完成'
-      return {
-        evaluation: `${tierDesc}\n${hint}${aiReasoning ? `\n${aiReasoning}` : ''}`,
-        rewardReason: hint
-      }
-    }
+    // 调用AI生成评语
+    try {
+      const prompt = this.buildPackageEvaluationPrompt(pkg, answers, personalityScore, matchResult, aiReasoning)
 
-    return {
-      evaluation: `你完成了问道，天道已记录你的心性。${aiReasoning ? `\n${aiReasoning}` : ''}`,
-      rewardReason: '完成问道'
+      // ✨ 调试：记录prompt长度
+      this.context.logger.debug(`AI评语prompt长度: ${prompt.length} 字符`)
+      this.context.logger.debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
+
+      const response = await aiService.generate(prompt)
+
+      // 检查响应是否为 null
+      if (response) {
+        // ✨ 调试：记录原始响应
+        this.context.logger.debug(`AI评语原始响应: ${response}`)
+
+        // ✨ 增强JSON提取：容忍AI在JSON前后添加说明文字
+        let jsonText = response.trim()
+
+        // 尝试提取JSON（查找第一个{到最后一个}）
+        const jsonMatch = jsonText.match(/\{[\s\S]*\}/)
+        if (jsonMatch) {
+          jsonText = jsonMatch[0]
+          this.context.logger.debug(`提取的JSON: ${jsonText}`)
+        }
+
+        // 解析响应
+        const parsed = JSON.parse(jsonText)
+        return {
+          evaluation: parsed.evaluation || '问道完成',
+          rewardReason: parsed.rewardReason || '完成问道'
+        }
+      } else {
+        this.context.logger.warn('AI评语响应为null')
+        // 作为错误处理，会在下面的catch中处理降级
+        throw new Error('AI响应为空')
+      }
+    } catch (error) {
+      this.context.logger.warn('AI评语生成失败:', error)
+
+      if (enableFallback) {
+        this.context.logger.info('使用降级评语')
+        return this.getFallbackEvaluation(pkg, matchResult)
+      } else {
+        throw error
+      }
     }
   }
 

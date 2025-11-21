@@ -17,39 +17,67 @@ export interface Config {
   personalitySystemVersion?: 'v1.0' | 'v2.0'
   enableMultiplePaths?: boolean
   fallbackToV1?: boolean
-  enableAIScoring?: boolean
+  // 问道包AI打分（三态：'auto'使用包内配置, 'on'强制开启, 'off'强制关闭）
+  enableAIScoring?: 'auto' | 'on' | 'off'
   enableAIScoringFallback?: boolean
+  // 问道包AI评语（v0.8.2 新增，三态）
+  enableAIEvaluation?: 'auto' | 'on' | 'off'
+  enableAIEvaluationFallback?: boolean
+  // 步入仙途AI评分
   enableInitiationAIScoring?: boolean
   enableInitiationAIScoringFallback?: boolean
+  // 步入仙途AI生成（v0.8.2 新增）
+  enableInitiationAIResponse?: boolean
+  enableInitiationAIResponseFallback?: boolean
 }
 
 export const Config: Schema<Config> = Schema.intersect([
   // ========== AI 服务配置（基础依赖）==========
   Schema.object({
-    chatluna: chatluna.Config.description('选择 ChatLuna 模型（如 zhipu/GLM-4-Flash）和配置降级策略')
-  }).description('🤖 AI 服务配置（必需，用于问心系统和灵根分配）'),
+    chatluna: chatluna.Config.description('🌐 全局 AI 模型配置 | 选择 ChatLuna 模型（用于所有AI功能）')
+  }).description('🤖 AI 服务配置（必需）'),
 
   // ========== 步入仙途（角色创建）配置 ==========
   Schema.object({
+    enableInitiationAIResponse: Schema.boolean()
+      .default(true)
+      .description('✅ 推荐开启 | 使用 AI 生成个性化道号和天道评语'),
+
+    enableInitiationAIResponseFallback: Schema.boolean()
+      .default(false)
+      .description('⚠️ 建议关闭 | AI 失败时自动降级到模拟响应（禁用可防止作弊，但 AI 故障时功能不可用）'),
+
     enableInitiationAIScoring: Schema.boolean()
       .default(true)
-      .description('✅ 推荐开启 | 使用 AI 客观评估第3题开放题，提升性格分析准确性'),
+      .description('✅ 推荐开启 | 使用 AI 客观评估第3题开放题，提升性格分析准确性（用于灵根分配）'),
 
     enableInitiationAIScoringFallback: Schema.boolean()
       .default(true)
-      .description('✅ 推荐开启 | AI 失败时自动降级到关键词评分，保证角色创建流程不中断')
-  }).description('⭐ 步入仙途 AI 评分（v0.7.0 | 灵根分配专用）'),
+      .description('✅ 推荐开启 | AI 评分失败时自动降级到关键词评分，保证角色创建流程不中断')
+  }).description('⭐ 步入仙途配置（v0.8.2 | AI生成道号+评语+性格评分）'),
 
   // ========== 问道包（试炼系统）配置 ==========
   Schema.object({
-    enableAIScoring: Schema.boolean()
-      .default(true)
-      .description('✅ 推荐开启 | 使用 AI 智能评估开放题答案，识别复杂语义和作弊行为'),
+    enableAIScoring: Schema.union([
+      Schema.const('auto' as const).description('默认 - 使用包内预设配置（推荐）'),
+      Schema.const('on' as const).description('强制开启 - 所有问道包都使用AI打分'),
+      Schema.const('off' as const).description('强制关闭 - 所有问道包都禁用AI打分')
+    ]).default('auto').description('🎯 AI打分总开关 | 优先级高于包内配置'),
 
     enableAIScoringFallback: Schema.boolean()
       .default(false)
-      .description('⚠️ 建议关闭 | 关闭可防止作弊，AI 失败时会提示用户重试而非静默降级')
-  }).description('🎯 问道包 AI 评分（v0.6.0 | 试炼问心和奖励计算）'),
+      .description('⚠️ 建议关闭 | AI打分失败时自动降级到关键词评分，关闭可防止作弊'),
+
+    enableAIEvaluation: Schema.union([
+      Schema.const('auto' as const).description('默认 - 使用包内预设配置（推荐）'),
+      Schema.const('on' as const).description('强制开启 - 所有问道包都使用AI评语'),
+      Schema.const('off' as const).description('强制关闭 - 所有问道包都禁用AI评语')
+    ]).default('auto').description('🎭 AI评语总开关 | 优先级高于包内配置'),
+
+    enableAIEvaluationFallback: Schema.boolean()
+      .default(true)
+      .description('✅ 推荐开启 | AI评语失败时自动降级到模板评语，提升用户体验')
+  }).description('🎯 问道包 AI 配置（v0.8.2 | 独立控制打分和评语）'),
 
   // ========== 性格量化系统（高级功能，暂时搁置）==========
   Schema.object({
