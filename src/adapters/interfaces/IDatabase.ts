@@ -37,13 +37,12 @@ export interface IDatabase {
    * @param table 表名
    * @param query 查询条件（定位要更新的记录）
    * @param updates 更新的字段
-   * @returns 更新的记录数组
    */
   set<T = any>(
     table: string,
     query: Partial<T> | ((row: T) => boolean),
     updates: Partial<T>
-  ): Promise<T[]>
+  ): Promise<void>
 
   /**
    * 删除记录
