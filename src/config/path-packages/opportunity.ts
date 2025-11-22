@@ -1,6 +1,10 @@
 /**
  * 示例问道包 - 机缘包
  * 测试玩家能否把握机遇、识破陷阱
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const opportunityPackages: PathPackageTemplate[] = [
     name: '宝藏洞府',
     description: '你在修炼时偶然发现一处隐秘洞府，似有宝物气息传出',
     tags: ['opportunity', 'exploration'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.15,
+
     triggerConditions: {
-      minRealm: 2,           // 练气期
-      cooldownHours: 72,     // 3天冷却
-      triggerChance: 0.15    // 15%触发率
+      minRealm: 2           // 金丹期
     },
 
     // ✨ v0.8.2 新增：评分权重配置
@@ -107,15 +113,23 @@ export const opportunityPackages: PathPackageTemplate[] = [
     name: '神秘商人',
     description: '一位神秘商人出现在你面前，声称有绝世秘籍出售',
     tags: ['opportunity'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.20,
+
     triggerConditions: {
-      minRealm: 1,           // 练气期初期
-      cooldownHours: 48,     // 2天冷却
-      triggerChance: 0.2     // 20%触发率
+      minRealm: 1           // 筑基期
     },
 
     // ✨ v0.6.0 启用AI评分（向后兼容示例）
     // 注：保留旧配置以展示向后兼容性，等价于 aiFeatures: { enableScoring: true, enableEvaluation: true }
     requiresAI: true,
+
+    // ✨ v1.1.0 评分权重配置
+    scoringWeights: {
+      choiceWeight: 0.3,
+      openWeight: 0.7
+    },
 
     // ✨ v0.6.0 AI评分配置
     aiScoringConfig: {

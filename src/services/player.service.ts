@@ -1,5 +1,5 @@
 import { Player, CreatePlayerInput, PlayerDisplayInfo, ServiceResult } from '../types/player'
-import { REALMS, GameConfig, PlayerStatus } from '../config/constants'
+import { REALMS, REALM_LEVELS, GameConfig, PlayerStatus } from '../config/constants'
 import {
   calculateCombatPower,
   getRealmName,
@@ -224,6 +224,7 @@ export class PlayerService {
   /**
    * 尝试突破
    * v1.0.0 更新：使用包含buff加成的突破率计算
+   * v1.0.1 更新：区分小境界和大境界突破机制
    */
   async breakthrough(userId: string): Promise<ServiceResult<{ success: boolean; newRealm?: string; rate: number }>> {
     const player = await this.getPlayer(userId)
@@ -242,66 +243,100 @@ export class PlayerService {
       }
     }
 
+    // ✨ v1.0.1：动态获取最大小境界等级（支持未来扩展）
+    const maxRealmLevel = REALM_LEVELS.length - 1
+
     // 检查是否已达最高境界
-    if (player.realm >= REALMS.length - 1 && player.realmLevel >= 3) {
+    if (player.realm >= REALMS.length - 1 && player.realmLevel >= maxRealmLevel) {
       return { success: false, message: '你已达到最高境界' }
     }
 
-    // ✨ v1.0.0：使用包含buff加成的突破率计算
-    const rate = await this.bonusCalculator.calculateBreakthroughRate(player)
-    const isSuccess = randomSuccess(rate)
+    // ✨ v1.0.1：判断是否为大境界突破
+    const isMajorBreakthrough = player.realmLevel === maxRealmLevel
 
-    if (isSuccess) {
-      // 突破成功
-      let newRealm = player.realm
-      let newRealmLevel = player.realmLevel + 1
+    if (isMajorBreakthrough) {
+      // ========== 大境界突破：有失败风险 ==========
+      // 计算突破率（基础 + 灵根 + buff）
+      const rate = await this.bonusCalculator.calculateBreakthroughRate(player)
+      const isSuccess = randomSuccess(rate)
 
-      if (newRealmLevel > 3) {
-        newRealm++
-        newRealmLevel = 0
+      if (isSuccess) {
+        // 突破成功：进入下一个大境界的初期
+        const newRealm = player.realm + 1
+        const newRealmLevel = 0
+
+        // 计算新境界的修为上限
+        const baseNewCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
+        const newCultivationMax = await this.bonusCalculator.calculateCultivationRequirement(
+          { ...player, realm: newRealm, realmLevel: newRealmLevel },
+          baseNewCultivationMax
+        )
+
+        const newCombatPower = calculateCombatPower({ ...player, realm: newRealm, realmLevel: newRealmLevel })
+
+        await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
+          realm: newRealm,
+          realmLevel: newRealmLevel,
+          cultivation: 0,  // 大境界突破成功，修为清零
+          cultivationMax: newCultivationMax,
+          combatPower: newCombatPower,
+          lastActiveTime: new Date()
+        })
+
+        return {
+          success: true,
+          data: {
+            success: true,
+            newRealm: getRealmName(newRealm, newRealmLevel),
+            rate
+          },
+          message: '突破成功！踏入新的大境界'
+        }
+      } else {
+        // 突破失败：修为清空，境界不变
+        await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
+          cultivation: 0,
+          lastActiveTime: new Date()
+        })
+
+        return {
+          success: true,
+          data: {
+            success: false,
+            rate
+          },
+          message: '突破失败，修为散尽'
+        }
       }
+    } else {
+      // ========== 小境界突破：100%成功，不清空修为 ==========
+      const newRealmLevel = player.realmLevel + 1
 
-      // 计算新境界的修为上限
-      const baseNewCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
+      // 计算新小境界的修为上限
+      const baseNewCultivationMax = getNextRealmMaxCultivation(player.realm, newRealmLevel)
       const newCultivationMax = await this.bonusCalculator.calculateCultivationRequirement(
-        { ...player, realm: newRealm, realmLevel: newRealmLevel },
+        { ...player, realmLevel: newRealmLevel },
         baseNewCultivationMax
       )
 
-      const newCombatPower = calculateCombatPower({ ...player, realm: newRealm, realmLevel: newRealmLevel })
+      const newCombatPower = calculateCombatPower({ ...player, realmLevel: newRealmLevel })
 
       await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
-        realm: newRealm,
         realmLevel: newRealmLevel,
-        cultivation: 0,
         cultivationMax: newCultivationMax,
         combatPower: newCombatPower,
         lastActiveTime: new Date()
+        // 注意：cultivation 不更新，保留当前修为继续累积
       })
 
       return {
         success: true,
         data: {
           success: true,
-          newRealm: getRealmName(newRealm, newRealmLevel),
-          rate
+          newRealm: getRealmName(player.realm, newRealmLevel),
+          rate: 1.0  // 小境界突破100%成功
         },
-        message: '突破成功'
-      }
-    } else {
-      // 突破失败，修为清空
-      await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
-        cultivation: 0,
-        lastActiveTime: new Date()
-      })
-
-      return {
-        success: true,
-        data: {
-          success: false,
-          rate
-        },
-        message: '突破失败'
+        message: '突破成功！修为更上一层'
       }
     }
   }

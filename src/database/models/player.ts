@@ -45,6 +45,7 @@ export function initPlayerModel(ctx: Context) {
     // 时间
     createTime: 'timestamp',
     lastActiveTime: 'timestamp',
+    lastQuestioningTime: 'timestamp',  // v1.1.0 新增：最后一次完成问道守心的时间
 
     // 封禁状态（v0.9.2 新增）
     isBanned: { type: 'boolean', initial: false },

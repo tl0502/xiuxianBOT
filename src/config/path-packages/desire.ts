@@ -1,6 +1,10 @@
 /**
  * 问道包 - 欲望试炼
  * 面对权力、财富、美色的诱惑，考验自律与野心的平衡
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const desirePackages: PathPackageTemplate[] = [
     name: '权力诱惑',
     description: '一个强大宗门向你抛出橄榄枝，许诺给你长老之位，但需要你做一些见不得光的事',
     tags: ['desire', 'trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.12,
+
     triggerConditions: {
-      minRealm: 2,           // 练气期
-      cooldownHours: 96,     // 4天冷却
-      triggerChance: 0.12    // 12%触发率
+      minRealm: 2           // 金丹期
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
@@ -107,10 +113,12 @@ export const desirePackages: PathPackageTemplate[] = [
     name: '财富迷局',
     description: '你发现了一处隐秘宝库的线索，但获取它需要付出道德代价',
     tags: ['desire'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.14,
+
     triggerConditions: {
-      minRealm: 1,
-      cooldownHours: 84,     // 3.5天冷却
-      triggerChance: 0.14    // 14%触发率
+      minRealm: 1
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
@@ -203,10 +211,12 @@ export const desirePackages: PathPackageTemplate[] = [
     name: '红粉骷髅',
     description: '你遇到了一位绝世美人，她愿意与你双修，但似乎另有目的',
     tags: ['desire', 'trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.08,
+
     triggerConditions: {
-      minRealm: 3,           // 筑基期
-      cooldownHours: 120,    // 5天冷却
-      triggerChance: 0.08    // 8%触发率
+      minRealm: 3           // 元婴期
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）

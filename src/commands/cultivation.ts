@@ -11,7 +11,8 @@ export function registerCultivationCommands(ctx: Context, playerService: PlayerS
    * 命令：打坐
    * 功能：开始修炼，提升修为
    */
-  ctx.command('修仙.打坐 [hours:number]', '开始修炼，提升修为')
+  ctx.command('修仙/打坐 [hours:number]', '开始修炼，提升修为')
+    .alias('打坐')
     .usage('打坐 [小时数] - 默认1小时')
     .example('打坐 2  // 修炼2小时')
     .action(async ({ session }, hours = 1) => {
@@ -67,7 +68,8 @@ export function registerCultivationCommands(ctx: Context, playerService: PlayerS
    * 命令：突破
    * 功能：尝试突破境界
    */
-  ctx.command('修仙.突破', '尝试突破到更高境界')
+  ctx.command('修仙/突破', '尝试突破到更高境界')
+    .alias('突破')
     .action(async ({ session }) => {
       if (!session?.userId) return Messages.NO_SESSION
 

@@ -2,11 +2,13 @@ import { Context, h } from 'koishi'
 import { QuestioningService } from '../services/questioning.service'
 import { PlayerService } from '../services/player.service'
 import { atMessage } from '../utils/formatter'
-import { getRealmName, getSpiritualRootInfo } from '../utils/calculator'
+import { getSpiritualRootInfo } from '../utils/calculator'
 import { AnswerSubmitData } from '../types/questioning'
+import { extractMentionedUserId } from '../utils/common-helpers'
 
 /**
- * 注册问心相关命令
+ * 注册问道相关命令
+ * v1.1.0 更新：问心系统统一到问道包系统
  */
 export function registerQuestioningCommands(
   ctx: Context,
@@ -15,9 +17,13 @@ export function registerQuestioningCommands(
 ) {
 
   /**
-   * 问心列表（仅显示信息，实际使用时会随机选择）
+   * 问道守心（随机选择问道包）
+   * v1.1.0 重构：使用全局冷却和灵根亲和度抽取系统
+   * 触发范围：所有问道包（排除 initiation）
    */
-  ctx.command('修仙.问心列表', '查看可用的问心路径')
+  ctx.command('修仙/问道守心', '进行问道试炼（随机路径）')
+    .alias('问道守心')
+    .alias('问道')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -30,66 +36,32 @@ export function registerQuestioningCommands(
           ])
         }
 
-        // 获取可用路径
-        const paths = questioningService.getAvailablePaths(player)
+        // v1.1.0 新增：使用灵根亲和度抽取问道包
+        const pathPackageService = questioningService.getPathPackageService()
+        const selectedPackage = await pathPackageService.selectPackageWithAffinity(
+          player,
+          ['initiation']  // 排除步入仙途包
+        )
 
-        if (paths.length === 0) {
+        if (!selectedPackage) {
           return h('', [
-            atMessage(session.userId, ' 当前没有可用的问心路径')
+            atMessage(session.userId, ' 当前没有适合你的问道包，请提升境界后再来')
           ])
         }
 
-        let message = '\n\n━━━━ 问心路径 ━━━━\n\n'
-        message += '💫 使用 问心 命令将随机进入以下路径之一：\n\n'
-
-        for (const path of paths) {
-          message += `📖 ${path.name}\n`
-          message += `   ${path.description}\n`
-
-          if (path.minRealm !== undefined) {
-            message += `   最低要求：${getRealmName(path.minRealm, 0)}\n`
-          }
-
-          if (path.cooldown) {
-            message += `   冷却时间：${path.cooldown}小时\n`
-          }
-
-          message += '\n'
-        }
-
-        message += '━━━━━━━━━━━━━━'
-
-        return h('', [
-          h('at', { id: session.userId }),
-          h('text', { content: message })
-        ])
-
-      } catch (error) {
-        ctx.logger('xiuxian').error('查询问心列表失败:', error)
-        return h('', [
-          atMessage(session.userId, ' 查询问心列表时遇到了问题')
-        ])
-      }
-    })
-
-  /**
-   * 开始问心（随机选择路径）
-   */
-  ctx.command('修仙.问心', '进行问心试炼（随机路径）')
-    .action(async ({ session }) => {
-      if (!session?.userId) return '系统错误：无法获取用户信息'
-
-      try {
-        // 获取玩家信息
-        const player = await playerService.getPlayer(session.userId)
-        if (!player) {
+        // 检查是否已有进行中的问心（安全检查）
+        if (questioningService.isInQuestioning(session.userId)) {
           return h('', [
-            atMessage(session.userId, ' 你尚未踏入仙途，使用 步入仙途 开启修仙之路吧！')
+            atMessage(session.userId, ' 你正在进行问心，请先完成或取消')
           ])
         }
 
-        // 随机选择一条试炼路径
-        const result = await questioningService.startRandomTrialQuestioning(session.userId, player)
+        // 使用包的第一个tag启动（内部会检查冷却时间）
+        const result = await questioningService.startPackageByTag(
+          session.userId,
+          selectedPackage.tags[0],
+          player  // 传入玩家对象用于境界检查和冷却检查
+        )
 
         if (!result.success || !result.data) {
           return h('', [
@@ -97,20 +69,19 @@ export function registerQuestioningCommands(
           ])
         }
 
-        let message = `\n\n━━━━ ${result.data.pathName} ━━━━\n\n`
-        message += `${result.data.pathDescription}\n\n`
+        let message = `\n\n━━━━ ${result.data.packageName} ━━━━\n\n`
+        message += `${result.data.description}\n\n`
         message += `📝 问题 1/3：\n${result.data.question}\n\n`
 
         if (result.data.options) {
-          result.data.options.forEach((opt, i) => {
-            message += `${String.fromCharCode(65 + i)}. ${opt}\n`
+          result.data.options.forEach((opt: string) => {
+            message += `${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请输入严格的大写选项字母（例如：A），有效选项：${result.data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}`
         } else {
           message += `请自由回答`
         }
 
-        // 若服务端返回限时提示，则在题目后追加显式提示
         if (result.data.timeoutMessage) {
           message += `\n\n${result.data.timeoutMessage}`
         }
@@ -121,39 +92,37 @@ export function registerQuestioningCommands(
         ])
 
       } catch (error) {
-        ctx.logger('xiuxian').error('开始问心失败:', error)
+        ctx.logger('xiuxian').error('开始问道守心失败:', error)
         return h('', [
-          atMessage(session.userId, ' 开始问心时遇到了问题')
+          atMessage(session.userId, ' 开始问道试炼时遇到了问题')
         ])
       }
     })
 
   /**
-   * 取消问心
+   * 问道历史（原问心历史）
+   * v1.0.1 更新：支持@提及查看其他玩家
+   * v1.1.0 更新：改名为问道历史
    */
-  ctx.command('修仙.取消问心', '取消当前的问心')
+  ctx.command('修仙/问道历史', '查看问道历史记录')
+    .alias('问道历史')
+    .alias('问心历史')  // 兼容旧命令
+    .usage('问心历史 - 查看自己的问心记录\n问心历史 @玩家 - 查看被@玩家的问心记录')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
-      const result = questioningService.cancelQuestioning(session.userId)
-      return h('', [
-        atMessage(session.userId, ' ' + result.message)
-      ])
-    })
-
-  /**
-   * 问心历史
-   */
-  ctx.command('修仙.问心历史', '查看问心历史记录')
-    .action(async ({ session }) => {
-      if (!session?.userId) return '系统错误：无法获取用户信息'
+      const currentUserId = session.userId
 
       try {
-        const result = await questioningService.getHistory(session.userId)
+        // 检查是否有@提及
+        const mentionedUserId = extractMentionedUserId(session)
+        const targetUserId = mentionedUserId || currentUserId
+
+        const result = await questioningService.getHistory(targetUserId)
 
         if (!result.success || !result.data || result.data.length === 0) {
           return h('', [
-            atMessage(session.userId, ' 暂无问心记录')
+            atMessage(currentUserId, mentionedUserId ? ' 该玩家暂无问心记录' : ' 暂无问心记录')
           ])
         }
 
@@ -170,14 +139,14 @@ export function registerQuestioningCommands(
         message += '━━━━━━━━━━━━━━'
 
         return h('', [
-          h('at', { id: session.userId }),
+          h('at', { id: currentUserId }),
           h('text', { content: message })
         ])
 
       } catch (error) {
         ctx.logger('xiuxian').error('查询问心历史失败:', error)
         return h('', [
-          atMessage(session.userId, ' 查询问心历史时遇到了问题')
+          atMessage(currentUserId, ' 查询问心历史时遇到了问题')
         ])
       }
     })
@@ -196,14 +165,6 @@ export function registerQuestioningCommands(
     // 获取会话信息
     const questioningSession = questioningService.getSession(session.userId)
     if (!questioningSession) return next()
-
-    // 允许的命令
-    const allowedCommands = ['取消问心']
-    const command = session.content?.trim() || ''
-
-    if (allowedCommands.includes(command)) {
-      return next()
-    }
 
     // 其他输入视为答案
     const answer = session.content?.trim()
@@ -245,10 +206,10 @@ export function registerQuestioningCommands(
         message += `${data.question}\n\n`
 
         if (data.options) {
-          data.options.forEach((opt, i) => {
-            message += `${String.fromCharCode(65 + i)}. ${opt}\n`
+          data.options.forEach((opt) => {
+            message += `${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请输入严格的大写选项字母（例如：A），有效选项：${data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}`
         } else {
           message += `请自由回答`
         }

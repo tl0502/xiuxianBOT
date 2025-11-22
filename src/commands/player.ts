@@ -3,6 +3,7 @@ import { PlayerService, QuestioningService } from '../services'
 import { Messages } from '../config/messages'
 import { atMessage } from '../utils/formatter'
 import { getSpiritualRootInfo } from '../utils/calculator'
+import { extractMentionedUserId } from '../utils/common-helpers'
 
 /**
  * 注册玩家相关命令
@@ -16,7 +17,8 @@ export function registerPlayerCommands(
    * 命令：步入仙途
    * 功能：触发问心流程，由 AI 分配道号和灵根
    */
-  ctx.command('修仙.步入仙途', '踏入修仙世界，开启仙途之旅')
+  ctx.command('修仙/步入仙途', '踏入修仙世界，开启仙途之旅')
+    .alias('步入仙途')
     .action(async ({ session }) => {
       if (!session?.userId) return Messages.NO_SESSION
 
@@ -62,34 +64,41 @@ export function registerPlayerCommands(
    * 命令：天道记录
    * 功能：查看玩家个人信息
    * v1.0.0 更新：显示buff加成信息
+   * v1.0.1 更新：支持@提及查看其他玩家
    */
-  ctx.command('修仙.天道记录', '查看你的修仙信息')
+  ctx.command('修仙/天道记录', '查看修仙信息')
+    .alias('天道记录')
+    .usage('天道记录 - 查看自己的信息\n天道记录 @玩家 - 查看被@玩家的信息')
     .action(async ({ session }) => {
       if (!session?.userId) return Messages.NO_SESSION
 
-      const userId = session.userId
+      const currentUserId = session.userId
 
       try {
-        // 查询玩家信息
-        const result = await playerService.getDisplayInfo(userId)
+        // 检查是否有@提及
+        const mentionedUserId = extractMentionedUserId(session)
+        const targetUserId = mentionedUserId || currentUserId
+
+        // 查询目标玩家信息
+        const result = await playerService.getDisplayInfo(targetUserId)
 
         if (!result.success || !result.data) {
-          return atMessage(userId, Messages.NOT_REGISTERED)
+          return atMessage(currentUserId, mentionedUserId ? ' 该玩家尚未踏入仙途' : Messages.NOT_REGISTERED)
         }
 
         const data = result.data
 
         // ✨ v1.0.0: 获取玩家和buff信息
-        const player = await playerService.getPlayer(userId)
+        const player = await playerService.getPlayer(targetUserId)
         if (!player) {
-          return atMessage(userId, Messages.NOT_REGISTERED)
+          return atMessage(currentUserId, mentionedUserId ? ' 该玩家尚未踏入仙途' : Messages.NOT_REGISTERED)
         }
 
         const buffService = playerService.getBuffService()
         const bonusCalculator = playerService.getBonusCalculator()
 
         // 获取活跃buff
-        const activeBuffs = await buffService.getActiveBuffs(userId)
+        const activeBuffs = await buffService.getActiveBuffs(targetUserId)
 
         // 获取加成详情
         const bonusDetails = await bonusCalculator.getBonusDetails(player)
@@ -156,11 +165,11 @@ export function registerPlayerCommands(
 
         infoMessage += `\n━━━━━━━━━━━━━━`
 
-        return atMessage(userId, infoMessage)
+        return atMessage(currentUserId, infoMessage)
 
       } catch (error) {
         ctx.logger('xiuxian').error('查询玩家信息失败:', error)
-        return atMessage(userId, Messages.QUERY_ERROR)
+        return atMessage(currentUserId, Messages.QUERY_ERROR)
       }
     })
 }

@@ -3,7 +3,26 @@
  */
 
 import { PersonalityScore } from '../utils/personality-analyzer'
-import { Question } from '../config/questioning'
+import { SpiritualRootType } from '../config/spiritual-roots'
+
+/**
+ * 问题选项
+ */
+export interface QuestionOption {
+  text: string
+  value: string
+}
+
+/**
+ * 问题定义
+ */
+export interface Question {
+  id: string
+  type: 'choice' | 'text'
+  question: string
+  options?: QuestionOption[]  // 选择题的选项（数量可变，支持2-10个选项）
+  aiHint?: string  // AI评分提示（仅用于开放题）
+}
 
 /**
  * 预定义的问道包Tag
@@ -31,14 +50,115 @@ export type RewardTier = 'perfect' | 'good' | 'normal'
 
 /**
  * 触发条件配置
+ * v1.1.0 大幅扩展：支持精准匹配、灵根检查、资源检查等
  */
 export interface TriggerConditions {
-  minRealm?: number           // 最低境界要求
-  maxRealm?: number           // 最高境界限制
-  cooldownHours?: number      // 冷却时间（小时）
-  triggerChance?: number      // 随机触发概率 (0-1)
-  requiredItems?: string[]    // 需要的道具
-  requiredQuests?: string[]   // 需要完成的前置任务
+  // ========== 境界检查（支持范围匹配和精准匹配） ==========
+
+  /**
+   * 最低境界要求（0-8）
+   * - number: 要求玩家境界 >= minRealm
+   * - false: 跳过最低境界检查
+   */
+  minRealm?: number | false
+
+  /**
+   * 最高境界限制（0-8）
+   * - number: 要求玩家境界 <= maxRealm
+   * - false: 跳过最高境界检查
+   */
+  maxRealm?: number | false
+
+  /**
+   * 精准匹配境界（0-8）
+   * - number: 要求玩家境界必须等于 exactRealm（与 min/maxRealmLevel 组合使用可精准匹配小境界）
+   * - false: 不使用精准匹配，使用范围匹配
+   *
+   * 示例：
+   * - exactRealm: 2, minRealmLevel: 1, maxRealmLevel: 1 表示必须是筑基期中期
+   * - exactRealm: 2 表示必须是筑基期（任意小境界）
+   */
+  exactRealm?: number | false
+
+  // ========== 小境界检查（与 exactRealm 组合使用） ==========
+
+  /**
+   * 最低小境界要求（0-3：初期/中期/后期/大圆满）
+   * - number: 要求玩家小境界 >= minRealmLevel
+   * - false: 跳过最低小境界检查
+   */
+  minRealmLevel?: number | false
+
+  /**
+   * 最高小境界限制（0-3）
+   * - number: 要求玩家小境界 <= maxRealmLevel
+   * - false: 跳过最高小境界检查
+   */
+  maxRealmLevel?: number | false
+
+  // ========== 灵根检查 ==========
+
+  /**
+   * 需要的灵根
+   * - SpiritualRootType[]: 满足其一即可（白名单）
+   * - SpiritualRootType: 必须是该灵根
+   * - false: 跳过灵根检查
+   *
+   * 示例：
+   * - [SpiritualRootType.LIGHT, SpiritualRootType.DARK] 表示光灵根或暗灵根都可触发
+   * - SpiritualRootType.HA 表示必须是哈根才能触发
+   */
+  requiredSpiritualRoots?: SpiritualRootType[] | SpiritualRootType | false
+
+  /**
+   * 禁止的灵根（黑名单）
+   * 示例：[SpiritualRootType.PSEUDO] 表示伪灵根无法触发
+   */
+  forbiddenSpiritualRoots?: SpiritualRootType[]
+
+  // ========== 资源检查 ==========
+
+  /**
+   * 最低灵石要求
+   * - number: 要求玩家灵石 >= minSpiritStone
+   * - false: 跳过灵石检查
+   */
+  minSpiritStone?: number | false
+
+  // ========== 战绩检查 ==========
+
+  /**
+   * 最低击杀数要求
+   * - number: 要求玩家总击杀数 >= minKillCount
+   * - false: 跳过击杀数检查
+   */
+  minKillCount?: number | false
+
+  // ========== 其他条件 ==========
+
+  /**
+   * 需要的道具
+   */
+  requiredItems?: string[]
+
+  /**
+   * 需要完成的前置任务
+   */
+  requiredQuests?: string[]
+
+  // ========== 已废弃字段（保留向后兼容） ==========
+
+  /**
+   * @deprecated v1.1.0 已废弃：单个包的冷却时间，改用全局冷却机制
+   * 请在 constants.ts 的 PathPackageConfig.GLOBAL_COOLDOWN_HOURS 中配置
+   */
+  cooldownHours?: number
+
+  /**
+   * @deprecated v1.1.0 已废弃：触发概率已移到 PathPackageTemplate 外层
+   * 请使用 PathPackageTemplate.triggerChance 字段
+   */
+  triggerChance?: number
 }
 
 /**
@@ -96,12 +216,16 @@ export interface AIFeatures {
 
 /**
  * 问道包模板（核心接口）
+ * v1.1.0 更新：triggerChance 移到外层
  */
 export interface PathPackageTemplate {
   id: string                              // 唯一标识符
   name: string                            // 问道包名称
   description: string                     // 问道包描述
   tags: PathPackageTag[]                  // Tag数组，支持多标签
+
+  // ✨ v1.1.0 新增：触发概率（从 triggerConditions 中移出）
+  triggerChance: number                   // 基础触发概率（0-1），用于包抽取时的加权随机
 
   // 触发条件
   triggerConditions: TriggerConditions

@@ -1,6 +1,11 @@
 /**
  * 试炼问心问道包
  * 用于已入门玩家的心境磨练和修为考验
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
+ * - 添加 scoringWeights 配置
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -8,7 +13,7 @@ import { PathPackageTemplate } from '../../types/path-package'
 /**
  * 试炼问心专用问道包
  * - 需要已创建角色的玩家
- * - 有境界要求和冷却时间
+ * - 有境界要求
  * - 第3题为开放题，启用AI评分
  */
 export const trialPackages: PathPackageTemplate[] = [
@@ -17,10 +22,12 @@ export const trialPackages: PathPackageTemplate[] = [
     name: '心魔试炼',
     description: '直面内心深处的心魔，了解真实的自己',
     tags: ['trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.15,
+
     triggerConditions: {
-      minRealm: 0,           // 练气期即可
-      cooldownHours: 24,     // 24小时冷却
-      triggerChance: 1.0
+      minRealm: 0           // 练气期即可
     },
 
     // ✨ v0.6.0 启用AI评分（第3题开放题）
@@ -31,6 +38,12 @@ export const trialPackages: PathPackageTemplate[] = [
       openQuestionIndices: [2],  // 第3题是开放题
       maxScorePerDimension: 8,
       minScorePerDimension: -3
+    },
+
+    // ✨ v1.1.0 评分权重配置
+    scoringWeights: {
+      choiceWeight: 0.3,
+      openWeight: 0.7
     },
 
     questions: [
@@ -63,7 +76,40 @@ export const trialPackages: PathPackageTemplate[] = [
         // ✨ v0.6.0 AI评分提示
         aiHint: '评估修士的修行理念。识别核心追求：力量（greed高）、平和（stability高）、仁慈（kindness高）、还是野心（determination高）。检测作弊行为。'
       }
-    ]
+    ],
+    optimalScore: {
+      target: {
+        determination: 6,
+        courage: 6,
+        stability: 8,        // 需要稳定心境
+        focus: 7,            // 需要专注自省
+        honesty: 8,          // 需要诚实面对自己
+        kindness: 5,
+        greed: 2,            // 低贪念
+        impatience: 2,       // 不急躁
+        manipulation: 1      // 不自欺
+      },
+      rewards: {
+        perfect: {
+          type: 'cultivation',
+          value: 500,
+          aiPromptHint: '直面心魔，道心通明，修为大进'
+        },
+        good: {
+          type: 'cultivation',
+          value: 300,
+          aiPromptHint: '有所领悟，心境渐明'
+        },
+        normal: {
+          type: 'cultivation',
+          value: 100,
+          aiPromptHint: '略有所得，仍需磨练'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
   },
 
   {
@@ -71,10 +117,12 @@ export const trialPackages: PathPackageTemplate[] = [
     name: '道心叩问',
     description: '扣问道心，明悟修行真意',
     tags: ['trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.12,
+
     triggerConditions: {
-      minRealm: 1,           // 筑基期
-      cooldownHours: 48,     // 48小时冷却
-      triggerChance: 1.0
+      minRealm: 1           // 筑基期
     },
 
     requiresAI: true,
@@ -83,6 +131,12 @@ export const trialPackages: PathPackageTemplate[] = [
       openQuestionIndices: [2],
       maxScorePerDimension: 8,
       minScorePerDimension: -3
+    },
+
+    // ✨ v1.1.0 评分权重配置
+    scoringWeights: {
+      choiceWeight: 0.3,
+      openWeight: 0.7
     },
 
     questions: [
@@ -114,7 +168,40 @@ export const trialPackages: PathPackageTemplate[] = [
         question: '在你心中，"道"是什么？',
         aiHint: '评估修士的道心境界。识别是否坚守本心（honesty高）、灵活变通（stability低、focus低）、务实理性（focus高）。检测作弊行为。'
       }
-    ]
+    ],
+    optimalScore: {
+      target: {
+        determination: 7,    // 需要坚定
+        courage: 5,
+        stability: 7,        // 需要稳定
+        focus: 8,            // 需要专注悟道
+        honesty: 9,          // 需要绝对诚实面对本心
+        kindness: 6,
+        greed: 1,            // 极低贪念
+        impatience: 1,       // 不急躁
+        manipulation: 1      // 不自欺欺人
+      },
+      rewards: {
+        perfect: {
+          type: 'cultivation',
+          value: 800,
+          aiPromptHint: '道心坚定，明悟大道，修为暴涨'
+        },
+        good: {
+          type: 'cultivation',
+          value: 500,
+          aiPromptHint: '道心渐明，有所领悟'
+        },
+        normal: {
+          type: 'cultivation',
+          value: 200,
+          aiPromptHint: '道心未稳，仍需修行'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
   },
 
   {
@@ -122,10 +209,12 @@ export const trialPackages: PathPackageTemplate[] = [
     name: '因果审判',
     description: '回顾过往，审视因果，明了业力',
     tags: ['trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.10,
+
     triggerConditions: {
-      minRealm: 2,           // 金丹期
-      cooldownHours: 72,     // 72小时冷却
-      triggerChance: 1.0
+      minRealm: 2           // 金丹期
     },
 
     requiresAI: true,
@@ -134,6 +223,12 @@ export const trialPackages: PathPackageTemplate[] = [
       openQuestionIndices: [2],
       maxScorePerDimension: 8,
       minScorePerDimension: -3
+    },
+
+    // ✨ v1.1.0 评分权重配置
+    scoringWeights: {
+      choiceWeight: 0.3,
+      openWeight: 0.7
     },
 
     questions: [
@@ -165,6 +260,39 @@ export const trialPackages: PathPackageTemplate[] = [
         question: '如果可以对过去的自己说一句话，你会说什么？',
         aiHint: '评估修士对因果的理解。识别是否有悔意（stability低）、坚定（determination高）、反思（focus高）、还是逃避（honesty低）。检测作弊行为。'
       }
-    ]
+    ],
+    optimalScore: {
+      target: {
+        determination: 7,    // 需要坚定
+        courage: 6,
+        stability: 8,        // 需要稳定心境
+        focus: 9,            // 需要深刻反思
+        honesty: 8,          // 需要诚实面对过去
+        kindness: 7,         // 需要悲悯之心
+        greed: 2,            // 低贪念
+        impatience: 1,       // 不急躁
+        manipulation: 1      // 不逃避责任
+      },
+      rewards: {
+        perfect: {
+          type: 'cultivation',
+          value: 1000,
+          aiPromptHint: '明悟因果，业力清净，修为大涨'
+        },
+        good: {
+          type: 'cultivation',
+          value: 600,
+          aiPromptHint: '有所领悟，业力渐消'
+        },
+        normal: {
+          type: 'cultivation',
+          value: 300,
+          aiPromptHint: '略有所得，仍需参悟'
+        }
+      }
+    },
+    version: '1.0',
+    author: 'system',
+    enabled: true
   }
 ]

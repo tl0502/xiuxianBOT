@@ -5,9 +5,9 @@ import { QuestioningService } from '../services/questioning.service'
 import { registerPlayerCommands } from './player'
 import { registerCultivationCommands } from './cultivation'
 import { registerQuestioningCommands } from './questioning'
-import { registerPackageTestCommands } from './package-test'
 import { registerDevTestCommands } from './dev-test'
 import { registerDevBuffCommands } from './dev-buff'
+import { registerDevPackageCommands } from './dev-package'
 import { Config } from '../index'
 
 /**
@@ -31,12 +31,12 @@ export function registerCommands(ctx: Context, config: Config) {
   registerPlayerCommands(ctx, playerService, questioningService)
   registerCultivationCommands(ctx, playerService)
   registerQuestioningCommands(ctx, playerService, questioningService)
-  registerPackageTestCommands(ctx, playerService, questioningService)
 
-  // 开发者测试命令（根据配置启用）
+  // 开发者命令（根据配置启用）
   if (config?.enableDevTools) {
     registerDevTestCommands(ctx)
     registerDevBuffCommands(ctx, config)
-    ctx.logger('xiuxian').info('开发者测试命令已启用（包含Buff管理）')
+    registerDevPackageCommands(ctx, playerService, questioningService)
+    ctx.logger('xiuxian').info('开发者命令已启用（测试、Buff管理、问道包）')
   }
 }

@@ -1,17 +1,9 @@
-import { Context, h } from 'koishi'
+import { Context } from 'koishi'
 import { KoishiAppContext } from '../adapters/koishi'
 import { PlayerService } from '../services/player.service'
 import { BuffType, BuffSource } from '../types/buff'
 import { atMessage } from '../utils/formatter'
-
-/**
- * 从消息元素中提取@提及的用户ID
- */
-function extractMentionedUserId(session: any): string | null {
-  if (!session?.elements) return null
-  const atElements = h.select(session.elements, 'at')
-  return atElements.length > 0 ? atElements[0].attrs.id : null
-}
+import { extractMentionedUserId } from '../utils/common-helpers'
 
 /**
  * 注册开发者Buff管理命令（v1.0.0）
@@ -24,7 +16,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 查看玩家所有Buff
    */
-  ctx.command('修仙.查看buff', '查看玩家的所有buff（开发者）')
+  ctx.command('修仙/查看buff', '查看玩家的所有buff（开发者）')
+    .alias('查看buff')
     .usage('修仙.查看buff @玩家 - @提及玩家，不提及则查看自己')
     .example('修仙.查看buff  // 查看自己的buff')
     .example('修仙.查看buff @张三  // 查看张三的buff')
@@ -72,7 +65,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 添加Buff
    */
-  ctx.command('修仙.添加buff <type:string> <value:number> [hours:number]', '给玩家添加buff（开发者）')
+  ctx.command('修仙/添加buff <type:string> <value:number> [hours:number]', '给玩家添加buff（开发者）')
+    .alias('添加buff')
     .usage('修仙.添加buff @玩家 <类型> <数值> [持续时间（小时）]')
     .usage('类型: cultivation_speed | breakthrough_rate | cultivation_requirement')
     .example('修仙.添加buff @张三 cultivation_speed 0.5 24  // 添加50%修炼加速，持续24小时')
@@ -135,7 +129,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 删除Buff
    */
-  ctx.command('修仙.删除buff <buffId:number>', '删除指定buff（开发者）')
+  ctx.command('修仙/删除buff <buffId:number>', '删除指定buff（开发者）')
+    .alias('删除buff')
     .usage('修仙.删除buff <BuffID>')
     .example('修仙.删除buff 123  // 删除ID为123的buff')
     .action(async ({ session }, buffId) => {
@@ -162,7 +157,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 清理过期Buff
    */
-  ctx.command('修仙.清理过期buff', '手动清理所有过期的buff（开发者）')
+  ctx.command('修仙/清理过期buff', '手动清理所有过期的buff（开发者）')
+    .alias('清理过期buff')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -178,7 +174,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 查看Buff统计
    */
-  ctx.command('修仙.buff统计', '查看当前系统中的buff统计信息（开发者）')
+  ctx.command('修仙/buff统计', '查看当前系统中的buff统计信息（开发者）')
+    .alias('buff统计')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -230,7 +227,8 @@ export function registerDevBuffCommands(ctx: Context, config?: any) {
   /**
    * 清空玩家所有Buff
    */
-  ctx.command('修仙.清空buff', '清空指定玩家的所有buff（开发者）')
+  ctx.command('修仙/清空buff', '清空指定玩家的所有buff（开发者）')
+    .alias('清空buff')
     .usage('修仙.清空buff @玩家')
     .example('修仙.清空buff @张三  // 清空张三的所有buff')
     .action(async ({ session }) => {

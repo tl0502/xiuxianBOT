@@ -1,7 +1,6 @@
 import { Context } from 'koishi'
 import { IAppContext } from '../adapters/interfaces'
 import { KoishiAppContext } from '../adapters/koishi'
-import { QuestioningPath, PathPackageType, getRandomPath, getPathById as getPathByIdFromConfig, getPathsByPackageType } from '../config/questioning'
 import {
   QuestioningSession,
   ServiceResult,
@@ -13,7 +12,6 @@ import {
 } from '../types/questioning'
 import { Player } from '../types/player'
 import { AIHelper } from '../utils/ai-helper'
-import { getRealmName } from '../utils/calculator'
 import { PlayerService } from './player.service'
 import { RootStatsService } from './root-stats.service'
 import { SpiritualRootType } from '../config/spiritual-roots'
@@ -56,6 +54,11 @@ export class QuestioningService {
     // 注册所有问道包
     this.pathPackageService.registerAll(ALL_PATH_PACKAGES)
     this.context.logger.info(`已注册 ${ALL_PATH_PACKAGES.length} 个问道包`)
+
+    // v1.1.0 新增：同步问道包到数据库
+    this.pathPackageService.syncPackagesToDatabase().catch(err => {
+      this.context.logger.error('同步问道包到数据库失败:', err)
+    })
 
     // 启动定期清理任务（每5分钟清理一次过期session）
     this.cleanupInterval = setInterval(() => {
@@ -106,13 +109,15 @@ export class QuestioningService {
   }
 
   /**
-   * 获取所有可用的问心路径
+   * 获取所有可用的试炼问道包
    */
-  getAvailablePaths(player: Player): QuestioningPath[] {
-    const trialPaths = getPathsByPackageType(PathPackageType.TRIAL)
-    return trialPaths.filter(path => {
+  getAvailablePaths(player: Player): PathPackageTemplate[] {
+    const trialPackages = this.pathPackageService.getByTag('trial')
+    return trialPackages.filter((pkg: PathPackageTemplate) => {
       // 检查境界要求
-      if (path.minRealm !== undefined && player.realm < path.minRealm) {
+      if (pkg.triggerConditions.minRealm !== undefined &&
+          pkg.triggerConditions.minRealm !== false &&
+          player.realm < pkg.triggerConditions.minRealm) {
         return false
       }
       return true
@@ -120,10 +125,10 @@ export class QuestioningService {
   }
 
   /**
-   * 根据 ID 获取路径
+   * 根据 ID 获取问道包
    */
-  getPathById(pathId: string): QuestioningPath | null {
-    return getPathByIdFromConfig(pathId)
+  getPathById(pathId: string): PathPackageTemplate | null {
+    return this.pathPackageService.getById(pathId)
   }
 
   /**
@@ -131,7 +136,7 @@ export class QuestioningService {
    */
   async checkCooldown(userId: string, pathId: string): Promise<ServiceResult<CooldownCheckData>> {
     const path = this.getPathById(pathId)
-    if (!path || !path.cooldown) {
+    if (!path || !path.triggerConditions.cooldownHours) {
       return { success: true, message: '无冷却限制', data: { canStart: true } }
     }
 
@@ -150,7 +155,7 @@ export class QuestioningService {
 
     const lastTime = new Date(records[0].createTime).getTime()
     const now = Date.now()
-    const cooldownMs = path.cooldown * 60 * 60 * 1000
+    const cooldownMs = path.triggerConditions.cooldownHours * 60 * 60 * 1000
     const elapsed = now - lastTime
 
     if (elapsed < cooldownMs) {
@@ -212,23 +217,26 @@ export class QuestioningService {
 
       // 要求严格：仅接受单个大写 ASCII 字母（不接受全角、标点、多个字符或小写）
       if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
+        this.context.logger.debug(`[问心] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
         return { success: false, message: `请输入严格的大写选项字母（例如：${validLetters[0]}），有效选项：${validLetters.join('/')}。` }
       }
 
       const letter = raw
       if (!validLetters.includes(letter)) {
+        this.context.logger.debug(`[问心] 用户${userId}输入无效选项: "${letter}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
         return { success: false, message: `请输入有效选项（${validLetters.join('/') }）` }
       }
 
       // 存储选项对象（字母 + 文本）
       const optionText = currentQuestion.options![letter.charCodeAt(0) - 65].text
       session.answers.push({ letter, text: optionText })
+      this.context.logger.debug(`[问心] 用户${userId}选择: "${letter}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
       // 开放题：进行反作弊检测
       const detect = this.detectExploitation(answer || '')
       if (detect.isExploit) {
         // 步入仙途：直接失败
-        if ((path as any).packageType === PathPackageType.INITIATION) {
+        if (path.tags.includes('initiation')) {
           this.sessions.delete(userId)
           return { success: false, message: `问心失败：检测到异常回答（${detect.reason}）。请以正常语句作答。` }
         }
@@ -270,7 +278,7 @@ export class QuestioningService {
 
       // ✨ submitAnswer现在仅用于步入仙途注册流程
       // 如果pathId不是INITIATION类型，说明路由错误
-      if (path.packageType !== PathPackageType.INITIATION) {
+      if (!path.tags.includes('initiation')) {
         this.context.logger.error(`路由错误：非INITIATION包${path.id}错误进入submitAnswer，应走submitPackageAnswer`)
         this.sessions.delete(userId)
         return { success: false, message: '系统错误：路径类型不匹配' }
@@ -429,10 +437,11 @@ export class QuestioningService {
     }
 
     // 随机选择一条步入仙途路径
-    const path = getRandomPath(PathPackageType.INITIATION)
-    if (!path) {
+    const initiationPackages = this.pathPackageService.getByTag('initiation')
+    if (initiationPackages.length === 0) {
       return { success: false, message: '未找到步入仙途路径' }
     }
+    const path = initiationPackages[Math.floor(Math.random() * initiationPackages.length)]
 
     // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
     const session: QuestioningSession = {
@@ -463,7 +472,7 @@ export class QuestioningService {
   }
 
   /**
-   * 开始试炼问心（随机选择一条 TRIAL 路径）
+   * 开始试炼问心（随机选择一条 trial 标签的问道包）
    */
   async startRandomTrialQuestioning(userId: string, player: Player): Promise<ServiceResult<InitiationStartData>> {
     // 检查是否已有进行中的问心
@@ -471,19 +480,28 @@ export class QuestioningService {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
     }
 
-    // 随机选择一条试炼路径
-    const path = getRandomPath(PathPackageType.TRIAL)
-    if (!path) {
+    // 随机选择一条试炼包
+    const trialPackages = this.pathPackageService.getByTag('trial')
+    if (trialPackages.length === 0) {
       return { success: false, message: '未找到试炼路径' }
     }
 
-    // 检查境界要求
-    if (path.minRealm !== undefined && player.realm < path.minRealm) {
-      return {
-        success: false,
-        message: `需要达到 ${getRealmName(path.minRealm, 0)} 才能进行此问心`
+    // 过滤出符合境界要求的
+    const availablePackages = trialPackages.filter((pkg: PathPackageTemplate) => {
+      if (pkg.triggerConditions.minRealm !== undefined &&
+          pkg.triggerConditions.minRealm !== false &&
+          player.realm < pkg.triggerConditions.minRealm) {
+        return false
       }
+      return true
+    })
+
+    if (availablePackages.length === 0) {
+      return { success: false, message: '暂无符合你境界的试炼路径' }
     }
+
+    // 随机选择一个
+    const path = availablePackages[Math.floor(Math.random() * availablePackages.length)]
 
     // 检查冷却
     const cooldownResult = await this.checkCooldown(userId, path.id)
@@ -526,7 +544,7 @@ export class QuestioningService {
   private async completeInitiationQuestioning(
     userId: string,
     session: QuestioningSession,
-    path: QuestioningPath
+    path: PathPackageTemplate
   ): Promise<ServiceResult<InitiationCompleteData>> {
     try {
       this.context.logger.info('=== 步入仙途完成流程开始 ===')
@@ -718,19 +736,28 @@ export class QuestioningService {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
     }
 
+    // 检查问道守心冷却（v1.1.0：简化为直接检查玩家lastQuestioningTime字段）
+    const cooldownHours = 8  // 固定8小时冷却
+    if (player.lastQuestioningTime) {
+      const lastTime = new Date(player.lastQuestioningTime).getTime()
+      const now = Date.now()
+      const elapsed = now - lastTime
+      const cooldownMs = cooldownHours * 60 * 60 * 1000
+
+      if (elapsed < cooldownMs) {
+        const remainingHours = Math.ceil((cooldownMs - elapsed) / (60 * 60 * 1000))
+        this.context.logger.info(`[问道守心冷却] 用户${userId}冷却中，还需${remainingHours}小时`)
+        return {
+          success: false,
+          message: `冷却中，还需 ${remainingHours} 小时`
+        }
+      }
+    }
+
     // 随机获取该tag下的问道包
     const pkg = this.pathPackageService.getRandomByTag(tag, player.realm)
     if (!pkg) {
       return { success: false, message: `未找到可用的${tag}问道包` }
-    }
-
-    // 检查冷却时间
-    const cooldownCheck = await this.pathPackageService.checkCooldown(userId, pkg.id)
-    if (!cooldownCheck.canUse) {
-      return {
-        success: false,
-        message: `冷却中，还需 ${cooldownCheck.remainingHours} 小时`
-      }
     }
 
     // 创建会话
@@ -744,6 +771,11 @@ export class QuestioningService {
       timeoutSeconds: this.getDefaultTimeoutSeconds()
     }
     this.sessions.set(userId, session)
+
+    // v1.1.0 新增：记录触发次数
+    this.pathPackageService.incrementTriggerCount(pkg.id).catch(err => {
+      this.context.logger.error('更新触发次数失败:', err)
+    })
 
     // 返回第一题
     const firstQuestion = pkg.questions[0]
@@ -917,6 +949,17 @@ export class QuestioningService {
         rewardReason: aiEvaluation.rewardReason,
         createTime: new Date()
       })
+
+      // v1.1.0 新增：记录完成次数
+      this.pathPackageService.incrementCompleteCount(pkg.id).catch(err => {
+        this.context.logger.error('更新完成次数失败:', err)
+      })
+
+      // v1.1.0 新增：更新玩家的问道守心完成时间
+      await this.context.database.set<any>('xiuxian_player_v3', { userId } as any, {
+        lastQuestioningTime: new Date()
+      } as any)
+      this.context.logger.info(`[问道守心] 更新用户${userId}完成时间`)
 
       // 清除会话
       this.sessions.delete(userId)
@@ -1276,15 +1319,18 @@ ${aiReasoning}
       const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
 
       if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
+        this.context.logger.debug(`[问道] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
         return { success: false, message: `请输入严格的大写选项字母（例如：${validLetters[0]}），有效选项：${validLetters.join('/')}。` }
       }
 
       if (!validLetters.includes(raw)) {
+        this.context.logger.debug(`[问道] 用户${userId}输入无效选项: "${raw}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
         return { success: false, message: `请输入有效选项（${validLetters.join('/')}）` }
       }
 
       const optionText = currentQuestion.options![raw.charCodeAt(0) - 65].text
       session.answers.push({ letter: raw, text: optionText })
+      this.context.logger.debug(`[问道] 用户${userId}选择: "${raw}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
       // 开放题反作弊检测
       const detect = this.detectExploitation(answer || '')
