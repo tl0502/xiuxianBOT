@@ -7,6 +7,7 @@
 
 import { Context } from 'koishi'
 import { PersonalityScore } from './personality-analyzer'
+import { AIConfig } from '../config/constants'
 
 /**
  * AI开放题评分结果
@@ -65,7 +66,7 @@ export class AIOpenQuestionScorer {
 
     try {
       // 调用AI
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.PACKAGE_SCORING_TIMEOUT)
 
       if (!response) {
         throw new Error('AI返回空响应')
@@ -77,8 +78,8 @@ export class AIOpenQuestionScorer {
       // 验证并约束分数范围
       this.validateAndClampScore(
         parsed.personality,
-        options?.maxScore ?? 8,
-        options?.minScore ?? -3
+        options?.maxScore ?? AIConfig.MAX_SCORE_PER_DIMENSION,
+        options?.minScore ?? AIConfig.MIN_SCORE_PER_DIMENSION
       )
 
       return parsed
@@ -410,7 +411,7 @@ ${previousAnswers && previousAnswers.length > 0 ?
     try {
       // 调用AI
       this.ctx.logger('xiuxian').debug(`INITIATION AI评分Prompt长度: ${prompt.length}字符`)
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_SCORING_TIMEOUT)
 
       if (!response) {
         throw new Error('AI返回空响应')
@@ -428,8 +429,8 @@ ${previousAnswers && previousAnswers.length > 0 ?
       // 验证并约束分数范围（INITIATION使用更保守的范围）
       this.validateAndClampScore(
         parsed.personality,
-        options?.maxScore ?? 5,
-        options?.minScore ?? -3
+        options?.maxScore ?? AIConfig.MAX_SCORE_PER_DIMENSION,
+        options?.minScore ?? AIConfig.MIN_SCORE_PER_DIMENSION
       )
 
       this.ctx.logger('xiuxian').info('INITIATION AI评分成功')

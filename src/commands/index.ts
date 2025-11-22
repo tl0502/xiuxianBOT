@@ -7,6 +7,7 @@ import { registerCultivationCommands } from './cultivation'
 import { registerQuestioningCommands } from './questioning'
 import { registerPackageTestCommands } from './package-test'
 import { registerDevTestCommands } from './dev-test'
+import { registerDevBuffCommands } from './dev-buff'
 import { Config } from '../index'
 
 /**
@@ -35,6 +36,7 @@ export function registerCommands(ctx: Context, config: Config) {
   // 开发者测试命令（根据配置启用）
   if (config?.enableDevTools) {
     registerDevTestCommands(ctx)
-    ctx.logger('xiuxian').info('开发者测试命令已启用')
+    registerDevBuffCommands(ctx, config)
+    ctx.logger('xiuxian').info('开发者测试命令已启用（包含Buff管理）')
   }
 }

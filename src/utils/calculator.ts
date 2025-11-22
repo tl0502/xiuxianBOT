@@ -110,3 +110,15 @@ export function getSpiritualRootInfo(spiritualRoot: string): { name: string; des
     description: root?.description || '未知灵根'
   }
 }
+
+// ==================== v1.0.0 Buff系统兼容说明 ====================
+//
+// 注意：以上函数为同步版本，仅计算灵根加成，不包含buff加成
+//
+// 如需计算包含buff加成的完整倍率，请使用 BonusCalculatorService：
+// - calculateCultivationMultiplier() - 修炼速度倍率（含buff）
+// - calculateBreakthroughRate() - 突破率（含buff）
+// - calculateCultivationRequirement() - 修为需求（含buff）
+//
+// PlayerService 已集成 BonusCalculatorService，会自动使用包含buff的计算
+// ==============================================================

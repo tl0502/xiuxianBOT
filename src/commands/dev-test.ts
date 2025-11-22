@@ -1,9 +1,18 @@
-import { Context } from 'koishi'
+import { Context, h } from 'koishi'
 import { FateCalculator } from '../utils/fate-calculator'
 import { analyzePersonality, PersonalityScore } from '../utils/personality-analyzer'
 import { KoishiAppContext } from '../adapters/koishi'
 import { RootStatsService } from '../services/root-stats.service'
 import { atMessage } from '../utils/formatter'
+
+/**
+ * 从消息元素中提取@提及的用户ID
+ */
+function extractMentionedUserId(session: any): string | null {
+  if (!session?.elements) return null
+  const atElements = h.select(session.elements, 'at')
+  return atElements.length > 0 ? atElements[0].attrs.id : null
+}
 
 /**
  * 注册开发者测试命令
@@ -163,23 +172,27 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 清理测试玩家
    */
-  ctx.command('修仙.清理玩家 <userId:string>', '删除指定玩家数据（开发者）')
-    .usage('清理玩家 <用户ID>')
-    .example('清理玩家 123456')
-    .action(async ({ session }, userId) => {
+  ctx.command('修仙.清理玩家', '删除指定玩家数据（开发者）')
+    .usage('修仙.清理玩家 @玩家')
+    .example('修仙.清理玩家 @张三')
+    .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
-      if (!userId) {
-        return atMessage(session.userId, ' 请指定要清理的用户ID')
+      // 从@提及中获取目标用户ID
+      const mentionedUserId = extractMentionedUserId(session)
+      if (!mentionedUserId) {
+        return atMessage(session.userId, ' 请使用 @提及 指定要清理的玩家')
       }
 
       try {
         // 删除玩家数据
-        await ctx.database.remove('xiuxian_player_v3', { odId: userId } as any)
+        await ctx.database.remove('xiuxian_player_v3', { userId: mentionedUserId } as any)
         // 删除问心记录
-        await ctx.database.remove('xiuxian_questioning_v3', { odId: userId } as any)
+        await ctx.database.remove('xiuxian_questioning_v3', { userId: mentionedUserId } as any)
+        // 删除buff记录
+        await ctx.database.remove('xiuxian_buff_v3', { userId: mentionedUserId } as any)
 
-        return atMessage(session.userId, ` 已清理玩家 ${userId} 的数据`)
+        return atMessage(session.userId, ` 已清理玩家的数据`)
 
       } catch (error) {
         ctx.logger('xiuxian').error('清理玩家失败:', error)

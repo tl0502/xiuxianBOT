@@ -8,6 +8,7 @@ import { isUsingV2, getPersonalitySystemConfig } from '../config/personality-sys
 import { AIPersonalityAnalyzer } from '../experimental/ai-personality-analyzer'
 import { ExtendedFateCalculator } from '../experimental/extended-fate-calculator'
 import { getRandomInitiationPath } from '../experimental/path-packages'
+import { AIConfig } from '../config/constants'
 
 /**
  * AI 辅助工具类
@@ -290,7 +291,7 @@ export class AIHelper {
 {"daoName":"道号","personality":"性格评语","reason":"天道反馈"}`
 
       // 调用 AI 服务
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功')
         return response
@@ -365,7 +366,7 @@ ${personalityDesc}
 仅返回 JSON：
 {"daoName":"道号","personality":"性格评语","reason":"分配理由"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功（v2.0）')
         return response
@@ -442,7 +443,7 @@ ${personalityDesc}
 仅返回 JSON 对象。格式：
 {"personality":"性格评语","tendency":"问心倾向","reward":{"type":"cultivation","value":300},"reason":"奖励原因"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功')
         return response
@@ -751,7 +752,7 @@ ${answers.map((a, i) => `第${i + 1}题：${a || '未回答'}`).join('\n')}
 仅返回JSON格式：
 {"evaluation":"评语内容","rewardReason":"奖励原因"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.PACKAGE_EVALUATION_TIMEOUT)
 
       // 检查响应是否为空
       if (!response) {

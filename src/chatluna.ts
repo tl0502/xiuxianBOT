@@ -11,7 +11,7 @@ export interface Config {
 }
 
 export const Config: Schema<Config> = Schema.object({
-  model: Schema.dynamic('model').description('AI 模型（全局，用于所有AI功能）'),
+  model: Schema.dynamic('model').description('AI 模型（全局）'),
 })
 
 /**
@@ -46,7 +46,7 @@ export class XiuxianAIService extends Service {
   /**
    * 调用 AI 生成文本响应
    */
-  async generate(prompt: string): Promise<string | null> {
+  async generate(prompt: string, timeoutSeconds?: number): Promise<string | null> {
     const model = this.modelRef?.value
     if (!model) {
       this.ctx.logger('xiuxian-ai').warn('ChatLuna 模型未初始化')
@@ -54,8 +54,10 @@ export class XiuxianAIService extends Service {
     }
 
     try {
-      this.ctx.logger('xiuxian-ai').debug('调用 AI 模型...')
-      const message = await model.invoke(prompt)
+      this.ctx.logger('xiuxian-ai').debug(`调用 AI 模型...${timeoutSeconds ? ` (超时: ${timeoutSeconds}秒)` : ''}`)
+      const message = await model.invoke(prompt, {
+        timeout: timeoutSeconds ? timeoutSeconds * 1000 : undefined
+      })
       const response = getMessageContent(message.content)
       this.ctx.logger('xiuxian-ai').debug('AI 响应成功')
       return response

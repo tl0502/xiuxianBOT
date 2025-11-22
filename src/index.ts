@@ -3,6 +3,7 @@ import { initDatabase } from './database'
 import { registerCommands } from './commands'
 import { KoishiAppContext } from './adapters/koishi'
 import { RootStatsService } from './services/root-stats.service'
+import { PlayerService } from './services/player.service'
 import * as chatluna from './chatluna'
 import { PersonalitySystemVersion, setPersonalitySystemConfig } from './config/personality-system-config'
 
@@ -126,15 +127,33 @@ export function apply(ctx: Context, config: Config) {
     ctx.logger('xiuxian').info(`  - AI失败降级: ${config.fallbackToV1 !== false ? '启用' : '禁用'}`)
   }
 
-  // 初始化灵根统计表（公平性系统）
+  // 初始化灵根统计表（公平性系统）和Buff清理任务（v1.0.0）
+  let playerService: PlayerService | null = null
+
   ctx.on('ready', async () => {
     try {
-      const appContext = KoishiAppContext.from(ctx)
+      const appContext = KoishiAppContext.from(ctx, 'xiuxian', config)
+
+      // 初始化灵根统计表
       const rootStatsService = new RootStatsService(appContext)
       await rootStatsService.initializeStats()
       ctx.logger('xiuxian').info('初始灵根统计表已初始化')
+
+      // ✨ v1.0.0: 启动Buff清理定时任务
+      playerService = new PlayerService(appContext)
+      playerService.getBuffService().startCleanupTask()
+      ctx.logger('xiuxian').info('Buff清理定时任务已启动（每小时执行一次）')
     } catch (error) {
-      ctx.logger('xiuxian').error('初始化灵根统计表失败:', error)
+      ctx.logger('xiuxian').error('初始化失败:', error)
+    }
+  })
+
+  // ✨ v1.0.0: 插件卸载时停止Buff清理任务
+  ctx.on('dispose', () => {
+    if (playerService) {
+      playerService.getBuffService().stopCleanupTask()
+      ctx.logger('xiuxian').info('Buff清理定时任务已停止')
+      playerService = null
     }
   })
 

@@ -109,8 +109,8 @@ export class HybridPersonalityAnalyzer {
             aiHint: question.aiHint,
             previousAnswers,
             enableFallback: options.enableFallback,
-            maxScore: options.maxScorePerDimension ?? 8,
-            minScore: options.minScorePerDimension ?? -3
+            maxScore: options.maxScorePerDimension ?? AIConfig.MAX_SCORE_PER_DIMENSION,
+            minScore: options.minScorePerDimension ?? AIConfig.MIN_SCORE_PER_DIMENSION
           }
         )
 
