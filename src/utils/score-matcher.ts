@@ -4,6 +4,7 @@
 
 import { PersonalityScore } from './personality-analyzer'
 import { MatchResult, RewardTier, OptimalScoreConfig } from '../types/path-package'
+import { PathPackageConfig } from '../config/constants'
 
 /**
  * 9维性格维度列表
@@ -74,8 +75,8 @@ export function calculateMatchRate(
  * @returns 奖励等级
  */
 export function getRewardTier(matchRate: number): RewardTier {
-  if (matchRate >= 90) return 'perfect'
-  if (matchRate >= 60) return 'good'
+  if (matchRate >= PathPackageConfig.PERFECT_MATCH_THRESHOLD * 100) return 'perfect'
+  if (matchRate >= PathPackageConfig.GOOD_MATCH_THRESHOLD * 100) return 'good'
   return 'normal'
 }
 

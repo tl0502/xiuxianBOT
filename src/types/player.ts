@@ -37,9 +37,56 @@ export interface Player {
   createTime: Date              // 创建时间
   lastActiveTime: Date          // 最后活跃时间
 
+  // 封禁状态（v0.9.2 新增）
+  isBanned: boolean             // 是否封禁
+  banReason?: string            // 封禁原因
+  bannedAt?: Date               // 封禁时间
+  bannedUntil?: Date            // 封禁截止（null = 永久）
+
   // 统计
   totalCombatWin: number        // 总胜场
   totalCombatLose: number       // 总败场
+
+  // ========== 永久加成字段（v1.0.0 新增 - Buff系统）==========
+  /**
+   * 永久修炼速度加成（倍率）
+   * - 默认值：0
+   * - 示例：0.1 表示永久 +10% 修炼速度
+   * - 来源：装备、永久性物品、特殊奖励等
+   */
+  permanentCultivationBonus?: number
+
+  /**
+   * 永久突破率加成（固定值）
+   * - 默认值：0
+   * - 示例：0.05 表示永久 +5% 突破成功率
+   * - 来源：装备、永久性物品、特殊奖励等
+   */
+  permanentBreakthroughBonus?: number
+
+  /**
+   * 永久修为需求倍率（可正可负）
+   * - 默认值：0
+   * - 示例：-0.1 表示永久减少10%修为需求，0.2 表示永久增加20%修为需求
+   * - 来源：装备、事件、特殊状态等
+   */
+  permanentCultivationRequirement?: number
+
+  /**
+   * 永久战力加成（倍率）【预留】
+   * - 默认值：0
+   * - 示例：0.2 表示永久 +20% 战力
+   * - 来源：装备、永久性物品等
+   */
+  permanentCombatPowerBonus?: number
+
+  /**
+   * 永久灵石收益加成（倍率）【预留】
+   * - 默认值：0
+   * - 示例：0.15 表示永久 +15% 灵石收益
+   * - 来源：装备、宗门福利等
+   */
+  permanentSpiritStoneGainBonus?: number
 }
 
 // 创建玩家时的输入（由 AI 生成）

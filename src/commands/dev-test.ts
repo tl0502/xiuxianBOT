@@ -1,9 +1,18 @@
-import { Context } from 'koishi'
+import { Context, h } from 'koishi'
 import { FateCalculator } from '../utils/fate-calculator'
 import { analyzePersonality, PersonalityScore } from '../utils/personality-analyzer'
 import { KoishiAppContext } from '../adapters/koishi'
 import { RootStatsService } from '../services/root-stats.service'
 import { atMessage } from '../utils/formatter'
+
+/**
+ * 从消息元素中提取@提及的用户ID
+ */
+function extractMentionedUserId(session: any): string | null {
+  if (!session?.elements) return null
+  const atElements = h.select(session.elements, 'at')
+  return atElements.length > 0 ? atElements[0].attrs.id : null
+}
 
 /**
  * 注册开发者测试命令
@@ -86,25 +95,36 @@ export function registerDevTestCommands(ctx: Context) {
 
         let message = `\n\n━━━━ 灵根分布统计 ━━━━\n\n`
 
-        let total = 0
-        for (const count of stats.values()) {
-          total += count
+        let totalInitial = 0
+        let totalCurrent = 0
+        for (const counts of stats.values()) {
+          totalInitial += counts.initialCount
+          totalCurrent += counts.currentCount
         }
 
-        if (total === 0) {
+        if (totalInitial === 0 && totalCurrent === 0) {
           message += '暂无玩家数据\n'
         } else {
-          // 转换 Map 为数组并排序
-          const sorted = Array.from(stats.entries()).sort((a, b) => b[1] - a[1])
+          // 转换 Map 为数组并按 initialCount 排序
+          const sorted = Array.from(stats.entries()).sort((a, b) => b[1].initialCount - a[1].initialCount)
 
-          for (const [rootType, num] of sorted) {
-            if (num > 0) {
-              const percent = ((num / total) * 100).toFixed(1)
-              message += `${rootType}: ${num} (${percent}%)\n`
+          message += `【初始灵根】\n`
+          for (const [rootType, counts] of sorted) {
+            if (counts.initialCount > 0) {
+              const percent = ((counts.initialCount / totalInitial) * 100).toFixed(1)
+              message += `${rootType}: ${counts.initialCount} (${percent}%)\n`
             }
           }
 
-          message += `\n总计: ${total} 人`
+          message += `\n【当前灵根】\n`
+          for (const [rootType, counts] of sorted) {
+            if (counts.currentCount > 0) {
+              const percent = ((counts.currentCount / totalCurrent) * 100).toFixed(1)
+              message += `${rootType}: ${counts.currentCount} (${percent}%)\n`
+            }
+          }
+
+          message += `\n总计: ${totalInitial} 人（初始）/ ${totalCurrent} 人（当前）`
         }
 
         message += `\n\n━━━━━━━━━━━━━━`
@@ -114,6 +134,22 @@ export function registerDevTestCommands(ctx: Context) {
       } catch (error) {
         ctx.logger('xiuxian').error('查看统计失败:', error)
         return atMessage(session.userId, ' 查询失败')
+      }
+    })
+
+  /**
+   * 同步统计（从玩家表重新统计）
+   */
+  ctx.command('修仙.同步统计', '从玩家表重新统计灵根分布（开发者）')
+    .action(async ({ session }) => {
+      if (!session?.userId) return '系统错误：无法获取用户信息'
+
+      try {
+        await rootStatsService.rebuildStats()
+        return atMessage(session.userId, ' 灵根统计已同步，使用 修仙.查看统计 查看结果')
+      } catch (error) {
+        ctx.logger('xiuxian').error('同步统计失败:', error)
+        return atMessage(session.userId, ' 同步失败')
       }
     })
 
@@ -136,23 +172,27 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 清理测试玩家
    */
-  ctx.command('修仙.清理玩家 <userId:string>', '删除指定玩家数据（开发者）')
-    .usage('清理玩家 <用户ID>')
-    .example('清理玩家 123456')
-    .action(async ({ session }, userId) => {
+  ctx.command('修仙.清理玩家', '删除指定玩家数据（开发者）')
+    .usage('修仙.清理玩家 @玩家')
+    .example('修仙.清理玩家 @张三')
+    .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
-      if (!userId) {
-        return atMessage(session.userId, ' 请指定要清理的用户ID')
+      // 从@提及中获取目标用户ID
+      const mentionedUserId = extractMentionedUserId(session)
+      if (!mentionedUserId) {
+        return atMessage(session.userId, ' 请使用 @提及 指定要清理的玩家')
       }
 
       try {
         // 删除玩家数据
-        await ctx.database.remove('xiuxian_player_v3', { odId: userId } as any)
+        await ctx.database.remove('xiuxian_player_v3', { userId: mentionedUserId } as any)
         // 删除问心记录
-        await ctx.database.remove('xiuxian_questioning_v3', { odId: userId } as any)
+        await ctx.database.remove('xiuxian_questioning_v3', { userId: mentionedUserId } as any)
+        // 删除buff记录
+        await ctx.database.remove('xiuxian_buff_v3', { userId: mentionedUserId } as any)
 
-        return atMessage(session.userId, ` 已清理玩家 ${userId} 的数据`)
+        return atMessage(session.userId, ` 已清理玩家的数据`)
 
       } catch (error) {
         ctx.logger('xiuxian').error('清理玩家失败:', error)

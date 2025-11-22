@@ -4,21 +4,29 @@ import {
   calculateCombatPower,
   getRealmName,
   getNextRealmMaxCultivation,
-  calculateCultivationSpeed,
-  calculateBreakthroughRate,
   getSpiritualRootInfo
 } from '../utils/calculator'
 import { randomSuccess } from '../utils/random'
 import { formatDate } from '../utils/formatter'
 import { IAppContext } from '../adapters/interfaces'
+import { BuffService } from './buff.service'
+import { BonusCalculatorService } from './bonus-calculator.service'
 
 /**
  * 玩家服务类
  *
  * 注意：此服务已解耦 Koishi 框架，依赖 IAppContext 接口
+ * v1.0.0 更新：集成Buff系统，支持多来源加成
  */
 export class PlayerService {
-  constructor(private context: IAppContext) {}
+  private buffService: BuffService
+  private bonusCalculator: BonusCalculatorService
+
+  constructor(private context: IAppContext) {
+    // 初始化buff相关服务
+    this.buffService = new BuffService(context)
+    this.bonusCalculator = new BonusCalculatorService(this.buffService)
+  }
 
   /**
    * 获取玩家信息
@@ -135,6 +143,7 @@ export class PlayerService {
 
   /**
    * 开始修炼
+   * v1.0.0 更新：使用BonusCalculatorService计算修炼速度（包含buff加成）
    */
   async startCultivation(userId: string, hours: number = 1): Promise<ServiceResult<{ speed: number; gain: number }>> {
     const player = await this.getPlayer(userId)
@@ -146,7 +155,9 @@ export class PlayerService {
       return { success: false, message: '你正在忙碌中，无法修炼' }
     }
 
-    const speed = calculateCultivationSpeed(player)
+    // ✨ v1.0.0：使用包含buff加成的计算
+    const cultivationMultiplier = await this.bonusCalculator.calculateCultivationMultiplier(player)
+    const speed = Math.floor(GameConfig.CULTIVATION_BASE_SPEED * cultivationMultiplier)
     const endTime = new Date(Date.now() + hours * 60 * 60 * 1000)
 
     await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
@@ -164,6 +175,7 @@ export class PlayerService {
 
   /**
    * 结算修炼
+   * v1.0.0 更新：使用包含buff加成的修炼速度和修为需求计算
    */
   async settleCultivation(userId: string): Promise<ServiceResult<{ gained: number; current: number; max: number }>> {
     const player = await this.getPlayer(userId)
@@ -180,14 +192,19 @@ export class PlayerService {
     const endTime = Math.min(Date.now(), new Date(player.statusEndTime).getTime())
     const hours = (endTime - startTime) / (60 * 60 * 1000)
 
-    // 计算收益
-    const speed = calculateCultivationSpeed(player)
+    // ✨ v1.0.0：使用包含buff加成的计算
+    const cultivationMultiplier = await this.bonusCalculator.calculateCultivationMultiplier(player)
+    const speed = Math.floor(GameConfig.CULTIVATION_BASE_SPEED * cultivationMultiplier)
     const gained = Math.floor(speed * hours)
-    const newCultivation = Math.min(player.cultivation + gained, player.cultivationMax)
+
+    // ✨ v1.0.0：考虑修为需求倍率（可能被buff修改）
+    const cultivationMax = await this.bonusCalculator.calculateCultivationRequirement(player, player.cultivationMax)
+    const newCultivation = Math.min(player.cultivation + gained, cultivationMax)
 
     // 更新数据
     await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
       cultivation: newCultivation,
+      cultivationMax,  // ✨ 更新可能被buff修改的上限
       status: PlayerStatus.IDLE,
       statusEndTime: null,
       lastActiveTime: new Date()
@@ -198,7 +215,7 @@ export class PlayerService {
       data: {
         gained,
         current: newCultivation,
-        max: player.cultivationMax
+        max: cultivationMax
       },
       message: '修炼结算完成'
     }
@@ -206,6 +223,7 @@ export class PlayerService {
 
   /**
    * 尝试突破
+   * v1.0.0 更新：使用包含buff加成的突破率计算
    */
   async breakthrough(userId: string): Promise<ServiceResult<{ success: boolean; newRealm?: string; rate: number }>> {
     const player = await this.getPlayer(userId)
@@ -213,11 +231,14 @@ export class PlayerService {
       return { success: false, message: '玩家不存在' }
     }
 
+    // ✨ v1.0.0：使用可能被buff修改的修为需求检查
+    const cultivationMax = await this.bonusCalculator.calculateCultivationRequirement(player, player.cultivationMax)
+
     // 检查是否达到修为上限
-    if (player.cultivation < player.cultivationMax) {
+    if (player.cultivation < cultivationMax) {
       return {
         success: false,
-        message: `修为未满，当前：${player.cultivation}/${player.cultivationMax}`
+        message: `修为未满，当前：${player.cultivation}/${cultivationMax}`
       }
     }
 
@@ -226,8 +247,8 @@ export class PlayerService {
       return { success: false, message: '你已达到最高境界' }
     }
 
-    // 计算突破成功率
-    const rate = calculateBreakthroughRate(player)
+    // ✨ v1.0.0：使用包含buff加成的突破率计算
+    const rate = await this.bonusCalculator.calculateBreakthroughRate(player)
     const isSuccess = randomSuccess(rate)
 
     if (isSuccess) {
@@ -240,7 +261,13 @@ export class PlayerService {
         newRealmLevel = 0
       }
 
-      const newCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
+      // 计算新境界的修为上限
+      const baseNewCultivationMax = getNextRealmMaxCultivation(newRealm, newRealmLevel)
+      const newCultivationMax = await this.bonusCalculator.calculateCultivationRequirement(
+        { ...player, realm: newRealm, realmLevel: newRealmLevel },
+        baseNewCultivationMax
+      )
+
       const newCombatPower = calculateCombatPower({ ...player, realm: newRealm, realmLevel: newRealmLevel })
 
       await this.context.database.set<Player>('xiuxian_player_v3', { userId }, {
@@ -277,5 +304,19 @@ export class PlayerService {
         message: '突破失败'
       }
     }
+  }
+
+  /**
+   * 获取BuffService实例（供其他模块使用）
+   */
+  getBuffService(): BuffService {
+    return this.buffService
+  }
+
+  /**
+   * 获取BonusCalculatorService实例（供其他模块使用）
+   */
+  getBonusCalculator(): BonusCalculatorService {
+    return this.bonusCalculator
   }
 }

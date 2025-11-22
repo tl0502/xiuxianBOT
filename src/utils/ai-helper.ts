@@ -8,12 +8,17 @@ import { isUsingV2, getPersonalitySystemConfig } from '../config/personality-sys
 import { AIPersonalityAnalyzer } from '../experimental/ai-personality-analyzer'
 import { ExtendedFateCalculator } from '../experimental/extended-fate-calculator'
 import { getRandomInitiationPath } from '../experimental/path-packages'
+import { AIConfig } from '../config/constants'
 
 /**
  * AI 辅助工具类
  */
 export class AIHelper {
-  constructor(private ctx: Context) {}
+  private pluginConfig: any
+
+  constructor(private ctx: Context, pluginConfig?: any) {
+    this.pluginConfig = pluginConfig || {}
+  }
 
   /**
    * 调用 ChatLuna 生成步入仙途评估（分配道号和灵根）
@@ -45,11 +50,12 @@ export class AIHelper {
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
 
-      // 检查是否允许降级
-      const aiService = this.ctx.xiuxianAI
-      if (!aiService?.isFallbackEnabled()) {
+      // ✨ v0.9.2 检查是否允许降级（使用正确的配置源）
+      const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
+      if (!enableFallback) {
         // 不允许降级，重新抛出错误
-        throw error
+        this.ctx.logger('xiuxian').error('AI生成道号/评语失败，且未启用降级模式')
+        throw new Error('AI服务不可用，且未启用降级模式。请联系管理员配置AI服务或开启降级模式。')
       }
 
       // 允许降级，返回默认响应
@@ -77,10 +83,14 @@ export class AIHelper {
     this.ctx.logger('xiuxian').info(`代码已确定灵根：${selectedRoot}（${rootInfo.name}）`)
 
     // ✨ v0.8.2 检查是否启用AI生成道号和评语
-    const config = (this.ctx as any).config
-    const enableAIResponse = config?.enableInitiationAIResponse ?? true
+    const enableAIResponse = this.pluginConfig?.enableInitiationAIResponse ?? true
+    const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
 
     if (!enableAIResponse) {
+      if (!enableFallback) {
+        this.ctx.logger('xiuxian').error('AI生成道号/评语功能已禁用，且未启用降级')
+        throw new Error('AI生成道号/评语功能已禁用，且未启用降级模式。请联系管理员启用AI功能或开启降级模式。')
+      }
       this.ctx.logger('xiuxian').info('AI生成道号/评语功能已禁用，使用默认响应')
       return {
         daoName: `修士${Math.floor(Math.random() * 1000)}`,
@@ -176,11 +186,12 @@ export class AIHelper {
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
 
-      // 检查是否允许降级
-      const aiService = this.ctx.xiuxianAI
-      if (!aiService?.isFallbackEnabled()) {
+      // ✨ v0.9.2 检查是否允许降级
+      const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
+      if (!enableFallback) {
         // 不允许降级，重新抛出错误
-        throw error
+        this.ctx.logger('xiuxian').error('试炼问心AI评估失败，且未启用降级模式')
+        throw new Error('AI服务不可用，且未启用降级模式')
       }
 
       // 允许降级，返回默认奖励
@@ -206,10 +217,11 @@ export class AIHelper {
     // 检查 xiuxianAI 服务是否可用
     const aiService = this.ctx.xiuxianAI
     if (!aiService || !aiService.isAvailable()) {
-      // 检查是否允许降级
-      if (!aiService?.isFallbackEnabled()) {
-        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用模拟降级')
-        throw new Error('AI 服务不可用，请联系管理员配置 ChatLuna 或启用模拟降级')
+      // ✨ v0.9.2 检查是否允许降级
+      const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
+      if (!enableFallback) {
+        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用降级模式')
+        throw new Error('AI服务不可用，且未启用降级模式。请联系管理员配置AI服务或开启降级模式。')
       }
       this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
       return this.getMockInitiationResponse(answers, selectedRoot)
@@ -237,7 +249,7 @@ export class AIHelper {
 
 【你的任务】
 1. **道号(daoName)**:
-   - 2-4个汉字,深刻体现修士的性格特点
+   - 2-4个汉字
    - 结合修士的回答和已分配的灵根
    - 避免使用常见俗套的名字
 
@@ -245,15 +257,29 @@ export class AIHelper {
    - 50字以内,深入评价修士的性格和修仙潜力
    - 结合三个问题的回答，全面分析
 
-3. **天道反馈 (reason)**
-   - 根据“性格 + 道号 + 灵根 + 修士回答”生成一句庄重的天道宣言
-   - 模板结构必须包含：
-   - “经天鉴，该修士……”（严格的进行 正面或中性的描述，根据（修士回答）+（性格）来决定结果）注:正面或中性描述由修士回答的第3题决定
-   - “但........”（一句略带负面的描写，根据(修士回答的第3题)描写 注：仅当 第3题有内容过于敷衍,或存在作弊倾向时启用)
-   - “赐予道号『(daoName)』！”
-   - 末尾附上一小段带有修仙氛围的祝福，例如：
-       “愿道友.....。”（省略部分需 结合性格与灵根特性 编写）
-   - 全篇保持格局宏大、古风、庄重
+3.生成“天道反馈(reason)”，必须严格按以下结构输出：
+
+ 1. 开头固定句式：
+   经天鉴，该修士……
+   - 接一段正面或中性的古风描述（必写）
+   - 内容基于：性格 + 修士回答 + 灵根
+   - 不得写负面，不得口语
+
+ 2. “但……”句（可省略）
+   - 仅当第3题回答敷衍或有作弊倾向时加入
+   - 只写一句轻微提醒，不得严厉
+   - 若未触发条件，整句完全省略
+
+ 3. 道号宣告（必写）：
+   赐予道号『{{daoName}}』！
+
+ 4. 祝福语（必写）：
+   句式：愿道友……
+   - 内容结合性格与灵根写一句积极、古风的祝福
+
+整体要求：
+- 古风、庄重、像天道宣旨
+- 不可口语、可幽默、不可写表情
 
 【额外规则 · 必须遵守】
 - 不得修改灵根，不得提出灵根建议
@@ -265,7 +291,7 @@ export class AIHelper {
 {"daoName":"道号","personality":"性格评语","reason":"天道反馈"}`
 
       // 调用 AI 服务
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功')
         return response
@@ -275,9 +301,10 @@ export class AIHelper {
     }
 
     // AI 调用失败，检查是否允许降级
-    if (!aiService.isFallbackEnabled()) {
-      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用模拟降级')
-      throw new Error('AI 调用失败，请稍后重试或联系管理员')
+    const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
+    if (!enableFallback) {
+      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用降级模式')
+      throw new Error('AI调用失败，且未启用降级模式。请稍后重试或联系管理员开启降级模式。')
     }
 
     // 回退到模拟响应
@@ -301,8 +328,11 @@ export class AIHelper {
     // 检查 AI 服务
     const aiService = this.ctx.xiuxianAI
     if (!aiService || !aiService.isAvailable()) {
-      if (!aiService?.isFallbackEnabled()) {
-        throw new Error('AI 服务不可用')
+      // ✨ v0.9.2 检查是否允许降级
+      const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
+      if (!enableFallback) {
+        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用降级模式')
+        throw new Error('AI服务不可用，且未启用降级模式')
       }
       this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
       return this.getMockInitiationResponse(answers, selectedRoot)
@@ -336,7 +366,7 @@ ${personalityDesc}
 仅返回 JSON：
 {"daoName":"道号","personality":"性格评语","reason":"分配理由"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功（v2.0）')
         return response
@@ -346,8 +376,10 @@ ${personalityDesc}
     }
 
     // 降级
-    if (!aiService.isFallbackEnabled()) {
-      throw new Error('AI 调用失败')
+    const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
+    if (!enableFallback) {
+      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用降级模式')
+      throw new Error('AI调用失败，且未启用降级模式')
     }
 
     this.ctx.logger('xiuxian').warn('降级使用模拟响应')
@@ -387,10 +419,11 @@ ${personalityDesc}
   private async callChatLunaForTrial(): Promise<string> {
     const aiService = this.ctx.xiuxianAI
     if (!aiService || !aiService.isAvailable()) {
-      // 检查是否允许降级
-      if (!aiService?.isFallbackEnabled()) {
-        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用模拟降级')
-        throw new Error('AI 服务不可用，请联系管理员配置 ChatLuna 或启用模拟降级')
+      // ✨ v0.9.2 检查是否允许降级
+      const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
+      if (!enableFallback) {
+        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用降级模式')
+        throw new Error('AI服务不可用，且未启用降级模式')
       }
       this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
       return this.getMockTrialResponse()
@@ -410,7 +443,7 @@ ${personalityDesc}
 仅返回 JSON 对象。格式：
 {"personality":"性格评语","tendency":"问心倾向","reward":{"type":"cultivation","value":300},"reason":"奖励原因"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
       if (response) {
         this.ctx.logger('xiuxian').info('AI 响应成功')
         return response
@@ -420,9 +453,10 @@ ${personalityDesc}
     }
 
     // AI 调用失败，检查是否允许降级
-    if (!aiService.isFallbackEnabled()) {
-      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用模拟降级')
-      throw new Error('AI 调用失败，请稍后重试或联系管理员')
+    const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
+    if (!enableFallback) {
+      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用降级模式')
+      throw new Error('AI调用失败，且未启用降级模式')
     }
 
     // 回退到模拟响应
@@ -718,7 +752,7 @@ ${answers.map((a, i) => `第${i + 1}题：${a || '未回答'}`).join('\n')}
 仅返回JSON格式：
 {"evaluation":"评语内容","rewardReason":"奖励原因"}`
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.PACKAGE_EVALUATION_TIMEOUT)
 
       // 检查响应是否为空
       if (!response) {

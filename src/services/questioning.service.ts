@@ -1,6 +1,4 @@
 import { Context } from 'koishi'
-import * as fs from 'fs'
-import * as path from 'path'
 import { IAppContext } from '../adapters/interfaces'
 import { KoishiAppContext } from '../adapters/koishi'
 import { QuestioningPath, PathPackageType, getRandomPath, getPathById as getPathByIdFromConfig, getPathsByPackageType } from '../config/questioning'
@@ -23,7 +21,10 @@ import { PathPackageService } from './path-package.service'
 import { PathPackageTemplate, PathPackageTag, PackageExecutionResult, MatchResult } from '../types/path-package'
 import { calculateMatchResult, generateSimilarityAnalysis } from '../utils/score-matcher'
 import { ALL_PATH_PACKAGES } from '../config/path-packages/index'
+import { PathPackageConfig } from '../config/constants'
 import { HybridPersonalityAnalyzer } from '../utils/hybrid-personality-analyzer'
+import { AIConfig } from '../config/constants'
+import { BuffType, BuffSource } from '../types/buff'  // v1.0.0 新增：Buff系统
 
 /**
  * 问心服务类
@@ -42,11 +43,11 @@ export class QuestioningService {
   private hybridAnalyzer: HybridPersonalityAnalyzer
   private cleanupInterval: NodeJS.Timeout
 
-  constructor(private ctx: Context) {
-    // 创建 Adapter 上下文
-    this.context = KoishiAppContext.from(ctx)
+  constructor(private ctx: Context, pluginConfig?: any) {
+    // 创建 Adapter 上下文（传入插件配置）
+    this.context = KoishiAppContext.from(ctx, 'xiuxian', pluginConfig)
 
-    this.aiHelper = new AIHelper(ctx)
+    this.aiHelper = new AIHelper(ctx, pluginConfig)
     this.playerService = new PlayerService(this.context)
     this.rootStatsService = new RootStatsService(this.context)
     this.pathPackageService = new PathPackageService(this.context)
@@ -99,21 +100,9 @@ export class QuestioningService {
     this.sessions.clear()
   }
 
-  // 获取默认超时（秒），从仓库根目录 src/config/timeout.json 读取；读取失败返回 60
+  // 获取默认超时（秒），从常量中读取
   private getDefaultTimeoutSeconds(): number {
-    try {
-      const cfgPath = path.join(process.cwd(), 'src', 'config', 'timeout.json')
-      if (fs.existsSync(cfgPath)) {
-        const raw = fs.readFileSync(cfgPath, 'utf-8')
-        const cfg = JSON.parse(raw)
-        if (typeof cfg.defaultTimeoutSeconds === 'number' && cfg.defaultTimeoutSeconds > 0) {
-          return Math.floor(cfg.defaultTimeoutSeconds)
-        }
-      }
-    } catch (e) {
-      this.context.logger.warn('读取 src/config/timeout.json 失败，使用默认超时 60s')
-    }
-    return 60
+    return PathPackageConfig.SESSION_TIMEOUT_SECONDS
   }
 
   /**
@@ -314,8 +303,9 @@ export class QuestioningService {
 
   /**
    * 应用奖励
+   * v1.0.0 更新：支持buff奖励类型
    */
-  private async applyReward(userId: string, type: string, value: number): Promise<void> {
+  private async applyReward(userId: string, type: string, value: number, duration?: number): Promise<void> {
     const [player] = await this.context.database.get<any>('xiuxian_player_v3', { userId } as any)
     if (!player) return
 
@@ -335,9 +325,52 @@ export class QuestioningService {
         break
 
       case 'breakthrough':
-        // breakthrough 类型的奖励是临时的成功率加成，这里可以存储到玩家的某个字段
-        // 暂时不处理，或者可以添加一个 breakthroughBonus 字段
-        this.context.logger.info(`${userId} 获得突破成功率加成: ${value}`)
+        // ✨ v1.0.0：创建突破率buff（临时加成）
+        if (!duration) {
+          this.context.logger.warn('突破率奖励缺少duration参数，默认7天')
+          duration = 7 * 24  // 默认7天
+        }
+
+        const buffService = this.playerService.getBuffService()
+        await buffService.addBuff({
+          userId,
+          buffType: BuffType.BREAKTHROUGH_RATE,
+          buffSource: BuffSource.QUESTIONING,
+          sourceId: 'questioning_reward',
+          value,
+          isMultiplier: false,  // 固定值加成
+          startTime: new Date(),
+          endTime: new Date(Date.now() + duration * 60 * 60 * 1000),
+          stackable: true,
+          maxStacks: 3,
+          description: `问道奖励：突破成功率 ${value >= 0 ? '+' : ''}${(value * 100).toFixed(0)}%`
+        })
+
+        this.context.logger.info(`${userId} 获得突破成功率buff: ${value}, 持续${duration}小时`)
+        break
+
+      case 'cultivation_speed':
+        // ✨ v1.0.0：创建修炼速度buff（临时加成）
+        if (!duration) {
+          duration = 24  // 默认24小时
+        }
+
+        const buffService2 = this.playerService.getBuffService()
+        await buffService2.addBuff({
+          userId,
+          buffType: BuffType.CULTIVATION_SPEED,
+          buffSource: BuffSource.QUESTIONING,
+          sourceId: 'questioning_reward',
+          value,
+          isMultiplier: true,  // 倍率加成
+          startTime: new Date(),
+          endTime: new Date(Date.now() + duration * 60 * 60 * 1000),
+          stackable: true,
+          maxStacks: 3,
+          description: `问道奖励：修炼速度 ${value >= 0 ? '+' : ''}${(value * 100).toFixed(0)}%`
+        })
+
+        this.context.logger.info(`${userId} 获得修炼速度buff: ${value}, 持续${duration}小时`)
         break
     }
   }
@@ -599,6 +632,16 @@ export class QuestioningService {
     } catch (error) {
       this.context.logger.error('步入仙途问心完成流程错误:', error)
       this.sessions.delete(userId)
+
+      // ✨ 如果是AI相关错误，给出更明确的提示
+      const errorMessage = (error as Error).message || ''
+      if (errorMessage.includes('AI服务不可用')) {
+        return { success: false, message: 'AI服务不可用，且未启用降级模式。请联系管理员配置AI服务或开启降级模式。' }
+      }
+      if (errorMessage.includes('AI评分失败') || errorMessage.includes('AI返回空响应')) {
+        return { success: false, message: 'AI评分失败，且未启用降级模式。请稍后重试或联系管理员开启降级模式。' }
+      }
+
       return { success: false, message: '问心评估失败，请稍后重试' }
     }
   }
@@ -838,7 +881,12 @@ export class QuestioningService {
           analysisResult.aiReasoning
         )
       } else {
-        // 使用降级评语
+        // AI评语被禁用，检查是否允许使用降级评语
+        const enableAIEvaluationFallback = this.getAIEvaluationFallbackEnabled()
+        if (!enableAIEvaluationFallback) {
+          this.context.logger.error('AI评语被禁用，且未启用降级评语')
+          throw new Error('AI评语被禁用，且未启用降级模式。请联系管理员启用AI评语或开启降级模式。')
+        }
         this.context.logger.info('AI评语被禁用，使用降级评语')
         aiEvaluation = this.getFallbackEvaluation(pkg, matchResult)
       }
@@ -1058,7 +1106,7 @@ export class QuestioningService {
       this.context.logger.debug(`AI评语prompt长度: ${prompt.length} 字符`)
       this.context.logger.debug(`AI评语prompt前100字: ${prompt.substring(0, 100)}...`)
 
-      const response = await aiService.generate(prompt)
+      const response = await aiService.generate(prompt, AIConfig.PACKAGE_EVALUATION_TIMEOUT)
 
       // 检查响应是否为 null
       if (response) {

@@ -1,5 +1,5 @@
 import { Player } from '../types/player'
-import { REALMS, REALM_LEVELS, GameConfig } from '../config/constants'
+import { REALMS, REALM_LEVELS, GameConfig, CombatConfig, CultivationConfig } from '../config/constants'
 import {
   SpiritualRootType,
   SPIRITUAL_ROOTS,
@@ -64,8 +64,9 @@ export function calculateBreakthroughRate(player: Player): number {
  * 计算战力
  */
 export function calculateCombatPower(player: Player): number {
-  // 基础战力 = 境界 * 1000 + 境界等级 * 200
-  const basePower = player.realm * 1000 + player.realmLevel * 200
+  // 基础战力 = 境界 * 系数 + 境界等级 * 系数
+  const basePower = player.realm * CombatConfig.REALM_MULTIPLIER +
+                    player.realmLevel * CombatConfig.LEVEL_MULTIPLIER
   // 灵根加成
   const combatMultiplier = getSpiritualRootCombatBonus(player.spiritualRoot)
   // 总战力
@@ -95,8 +96,8 @@ export function getNextRealmMaxCultivation(realm: number, realmLevel: number): n
   const previousRealmMax = realm > 0 ? (REALMS[realm - 1]?.maxCultivation || 0) : 0
   const difference = currentRealmMax - previousRealmMax
 
-  // 每个小境界占总差值的 25%
-  return Math.floor(previousRealmMax + difference * (realmLevel + 1) / 4)
+  // 每个小境界占总差值的 1/REALM_LEVEL_COUNT
+  return Math.floor(previousRealmMax + difference * (realmLevel + 1) / CultivationConfig.REALM_LEVEL_COUNT)
 }
 
 /**
@@ -109,3 +110,15 @@ export function getSpiritualRootInfo(spiritualRoot: string): { name: string; des
     description: root?.description || '未知灵根'
   }
 }
+
+// ==================== v1.0.0 Buff系统兼容说明 ====================
+//
+// 注意：以上函数为同步版本，仅计算灵根加成，不包含buff加成
+//
+// 如需计算包含buff加成的完整倍率，请使用 BonusCalculatorService：
+// - calculateCultivationMultiplier() - 修炼速度倍率（含buff）
+// - calculateBreakthroughRate() - 突破率（含buff）
+// - calculateCultivationRequirement() - 修为需求（含buff）
+//
+// PlayerService 已集成 BonusCalculatorService，会自动使用包含buff的计算
+// ==============================================================

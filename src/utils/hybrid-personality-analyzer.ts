@@ -9,6 +9,7 @@ import { Context } from 'koishi'
 import { PersonalityScore, analyzePersonality } from './personality-analyzer'
 import { AIOpenQuestionScorer, AIOpenQuestionScore } from './ai-open-question-scorer'
 import { Question } from '../config/questioning'
+import { AIConfig } from '../config/constants'
 
 /**
  * 混合分析结果
@@ -59,8 +60,22 @@ export class HybridPersonalityAnalyzer {
     const openQuestionIndices = options?.openQuestionIndices ??
       questions.map((q, i) => q.type === 'text' ? i : -1).filter(i => i !== -1)
 
-    if (openQuestionIndices.length === 0 || !options?.requiresAI) {
-      // 没有开放题，或不需要AI，直接返回
+    if (openQuestionIndices.length === 0) {
+      // 没有开放题，直接返回选择题分数
+      return {
+        finalScore: choiceScore,
+        choiceScore: choiceScore,
+        usedAI: false
+      }
+    }
+
+    if (!options?.requiresAI) {
+      // 不需要AI，检查是否允许使用规则评分
+      if (!options?.enableFallback) {
+        this.ctx.logger('xiuxian').error('AI评分已禁用，且未启用规则评分降级')
+        throw new Error('AI评分已禁用，且未启用降级模式。请联系管理员启用AI评分或开启降级模式。')
+      }
+      // 允许降级，使用选择题分数
       return {
         finalScore: choiceScore,
         choiceScore: choiceScore,
@@ -94,8 +109,8 @@ export class HybridPersonalityAnalyzer {
             aiHint: question.aiHint,
             previousAnswers,
             enableFallback: options.enableFallback,
-            maxScore: options.maxScorePerDimension ?? 8,
-            minScore: options.minScorePerDimension ?? -3
+            maxScore: options.maxScorePerDimension ?? AIConfig.MAX_SCORE_PER_DIMENSION,
+            minScore: options.minScorePerDimension ?? AIConfig.MIN_SCORE_PER_DIMENSION
           }
         )
 
@@ -267,9 +282,9 @@ export class HybridPersonalityAnalyzer {
     aiScores: PersonalityScore[],
     weights?: { choiceWeight: number; openWeight: number }
   ): PersonalityScore {
-    // 默认权重
-    const choiceWeight = weights?.choiceWeight ?? 0.3
-    const openWeight = weights?.openWeight ?? 0.7
+    // 默认权重（优先使用自定义权重，其次使用全局配置）
+    const choiceWeight = weights?.choiceWeight ?? AIConfig.CHOICE_QUESTION_WEIGHT
+    const openWeight = weights?.openWeight ?? AIConfig.OPEN_QUESTION_WEIGHT
 
     // 计算AI平均分（多个开放题的平均值）
     const avgAI = this.averageScores(aiScores)
@@ -437,8 +452,12 @@ export class HybridPersonalityAnalyzer {
       const baselineScore = analyzePersonality(answers)
       this.ctx.logger('xiuxian').debug('基准分数（规则+关键词）:', JSON.stringify(baselineScore))
 
-      // 2. 如果不启用AI，直接返回基准分数
+      // 2. 如果不启用AI，检查是否允许使用关键词评分
       if (!enableAI) {
+        if (!enableFallback) {
+          this.ctx.logger('xiuxian').error('AI评分已禁用，且未启用关键词评分降级')
+          throw new Error('AI评分已禁用，且未启用降级模式。请联系管理员启用AI评分或开启降级模式。')
+        }
         this.ctx.logger('xiuxian').info('AI评分未启用，使用关键词评分')
         return {
           finalScore: baselineScore,
