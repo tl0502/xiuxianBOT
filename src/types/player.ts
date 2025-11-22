@@ -36,6 +36,7 @@ export interface Player {
   // 时间
   createTime: Date              // 创建时间
   lastActiveTime: Date          // 最后活跃时间
+  lastQuestioningTime?: Date    // v1.1.0 新增：最后一次完成问道守心的时间
 
   // 封禁状态（v0.9.2 新增）
   isBanned: boolean             // 是否封禁

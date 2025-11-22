@@ -1,6 +1,10 @@
 /**
  * 示例问道包 - 遗迹探索包
  * 考验玩家的探险能力和决策智慧
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const explorationPackages: PathPackageTemplate[] = [
     name: '上古遗迹',
     description: '你发现了一处上古遗迹的入口，里面机关重重',
     tags: ['exploration', 'opportunity'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.12,
+
     triggerConditions: {
-      minRealm: 2,
-      cooldownHours: 96,     // 4天冷却
-      triggerChance: 0.12    // 12%触发率
+      minRealm: 2
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
@@ -107,10 +113,12 @@ export const explorationPackages: PathPackageTemplate[] = [
     name: '秘境寻宝',
     description: '你获得了一张秘境地图，上面标注了宝藏位置',
     tags: ['exploration'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.10,
+
     triggerConditions: {
-      minRealm: 3,           // 筑基期
-      cooldownHours: 168,    // 7天冷却
-      triggerChance: 0.1     // 10%触发率
+      minRealm: 3           // 元婴期
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）

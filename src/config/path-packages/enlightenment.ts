@@ -1,6 +1,10 @@
 /**
  * 示例问道包 - 感悟包
  * 考验玩家的悟性和对道的理解
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
     name: '道心叩问',
     description: '静坐修炼时，心中浮现关于大道的疑问',
     tags: ['enlightenment', 'trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.25,
+
     triggerConditions: {
-      minRealm: 1,
-      cooldownHours: 24,
-      triggerChance: 0.25
+      minRealm: 1
     },
 
     // ✨ v0.8.2 新增：评分权重配置（感悟包更看重开放式回答）
@@ -107,10 +113,12 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
     name: '天地感悟',
     description: '观察天地万物，你似乎有所领悟',
     tags: ['enlightenment'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.20,
+
     triggerConditions: {
-      minRealm: 2,
-      cooldownHours: 48,
-      triggerChance: 0.2
+      minRealm: 2
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）

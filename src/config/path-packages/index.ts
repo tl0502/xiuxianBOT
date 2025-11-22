@@ -18,7 +18,7 @@ import { desirePackages } from './desire'
  */
 export const ALL_PATH_PACKAGES: PathPackageTemplate[] = [
   ...initiationPackages,   // 步入仙途（新玩家专用）
-  ...trialPackages,        // 试炼问心（心境磨练）
+  ...trialPackages,        
   ...opportunityPackages,
   ...enlightenmentPackages,
   ...demonPackages,

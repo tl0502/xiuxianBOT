@@ -1,6 +1,10 @@
 /**
  * 示例问道包 - 魔道包
  * 考验玩家面对黑暗诱惑时的抉择
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const demonPackages: PathPackageTemplate[] = [
     name: '心魔试炼',
     description: '修炼中遭遇心魔，黑暗的力量在向你招手',
     tags: ['demon', 'trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.10,
+
     triggerConditions: {
-      minRealm: 3,           // 筑基期
-      cooldownHours: 168,    // 7天冷却
-      triggerChance: 0.1     // 10%触发率
+      minRealm: 3           // 元婴期
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
@@ -107,10 +113,12 @@ export const demonPackages: PathPackageTemplate[] = [
     name: '禁忌之书',
     description: '你意外得到一本禁忌功法，上面记载着邪道秘术',
     tags: ['demon'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.08,
+
     triggerConditions: {
-      minRealm: 2,
-      cooldownHours: 120,    // 5天冷却
-      triggerChance: 0.08    // 8%触发率
+      minRealm: 2
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）

@@ -4,9 +4,57 @@
 
 ## 功能特性
 
-### 当前实现（v0.6.0 + v0.5.0 + v0.3.0扩展）
+### 当前实现（v1.1.0 + v1.0.1 + v1.0.0 + v0.6.0）
 
-**AI开放题评分系统（v0.6.0新增）**
+**问道守心系统重构（v1.1.0新增）**
+- ✨ **全局冷却机制**：移除单包冷却，改为全局冷却（默认72小时），所有问道包共享冷却时间
+- ✨ **灵根亲和度系统**：基于玩家灵根提升特定问道包触发概率，概率归一化确保总和100%
+- ✨ **增强权限检查**：
+  - 大境界精准匹配：`exactRealm: 3` 精确要求特定境界
+  - 小境界范围检查：`minRealmLevel/maxRealmLevel` 控制初期/中期/后期/大圆满
+  - 灵根白名单/黑名单：`requiredSpiritualRoots` 和 `forbiddenSpiritualRoots`
+  - 灵石数量要求：`minSpiritStone` 检查玩家灵石
+  - 击杀数量要求：`minKillCount` 检查战绩
+  - 条件跳过支持：使用 `false` 值跳过特定检查
+- ✨ **问道包配置优化**：
+  - `triggerChance` 移至包外层（PathPackageTemplate级别）
+  - 全局环境变量控制冷却时间和亲和度开关
+- ✨ **问道守心命令重构**：
+  - 自动排除"步入仙途"包
+  - 使用灵根亲和度智能选择问道包
+  - 全局冷却检查和友好提示
+
+**命令系统优化（v1.0.1新增）**
+- ✨ **命令别名支持**：所有命令支持省略 `修仙.` 前缀，例如 `天道记录` 或 `修仙 天道记录`
+- ✨ **@ 功能扩展**：查询命令支持查看其他玩家
+  - `天道记录 @玩家` - 查看其他玩家信息
+  - `问心历史 @玩家` - 查看其他玩家问心历史
+  - `查看buff @玩家` - 查看其他玩家buff（需开发者权限）
+- ✨ **突破机制优化**：区分小境界和大境界突破
+  - 小境界突破：100%成功，修为保留
+  - 大境界突破：概率成功，修为清零（成功或失败均清零）
+  - 动态检测支持未来境界系统扩展
+- ✨ **代码复用**：提取 `extractMentionedUserId()` 工具函数统一处理@提及
+- ✨ **命令整合**：问道包测试命令统一移至开发者工具（需启用 enableDevTools）
+
+**Buff系统（v1.0.0新增）**
+- ✨ **多维度加成**：修炼速度、突破率、修为需求（战力、灵石收益预留）
+- ✨ **加成公式**：
+  - 修炼倍率 = (全局+永久) × 灵根 × (1+临时)
+  - 突破率 = (全局+永久+灵根) + 临时
+  - 所需修为 = 设定 × (1+永久+临时)
+- ✨ **自动清理**：每小时清理过期buff
+- ✨ **堆叠控制**：支持buff堆叠和最大堆叠数限制
+- ✨ **多来源支持**：宗门、道具、特殊事件、全局活动等
+- 开发者命令（需启用 enableDevTools）：
+  - `查看buff @玩家` - 查看玩家所有buff
+  - `添加buff @玩家 <类型> <数值> [小时]` - 添加buff
+  - `删除buff <buffId>` - 删除指定buff
+  - `清空buff @玩家` - 清空玩家所有buff
+  - `清理过期buff` - 手动清理过期buff
+  - `buff统计` - 查看系统buff统计
+
+**AI开放题评分系统（v0.6.0）**
 - ✨ **混合评分机制**：选择题使用规则评分（稳定）+ 开放题使用AI评分（智能）
 - ✨ **智能作弊检测**：AI识别prompt注入、要求特定灵根等作弊行为
 - ✨ **9维性格量化**：determination、courage、stability、focus、honesty、kindness、greed、impatience、manipulation
@@ -14,27 +62,29 @@
 - ✨ **评分追溯性**：保存choiceScore、aiScores、usedAI等详细评分信息到数据库
 
 **玩家系统（AI驱动）**
-- `修仙.步入仙途` - 通过问心流程创建角色，AI 智能分配道号和灵根
-- `修仙.天道记录` - 查看完整修仙信息（境界、修为、灵石、战力、灵根等）
+- `步入仙途` / `修仙 步入仙途` - 通过问心流程创建角色，AI 智能分配道号和灵根
+- `天道记录` / `修仙 天道记录` - 查看修仙信息（支持 `@玩家` 查看他人）
 
 **修炼系统**
-- `修仙.打坐 [小时]` - 开始修炼，灵根影响修炼速度
-- `修仙.突破` - 尝试突破到更高境界，灵根影响成功率
+- `打坐 [小时]` / `修仙 打坐` - 开始修炼，灵根影响修炼速度
+- `突破` / `修仙 突破` - 尝试突破到更高境界
+  - 小境界（初期→中期→后期→大圆满）：100%成功，修为保留
+  - 大境界（练气→筑基→...）：概率成功，成功或失败均清空修为
 
 **问心系统（AI评估）**
-- `修仙.问心` - 进行试炼问心（随机路径），获得修为或灵石奖励
-- `修仙.问心列表` - 查看所有可用的问心路径
-- `修仙.问心历史` - 查看历史问心记录
-- `修仙.取消问心` - 中途退出当前问心
+- `问心` / `修仙 问心` - 进行试炼问心（随机路径），获得修为或灵石奖励
+- `问心历史` / `修仙 问心历史` - 查看问心记录（支持 `@玩家` 查看他人）
 
-**问道包系统（v0.3.0新增）**
+**问道包系统（v0.3.0）**
 - ✨ **Tag分类系统**：支持机缘、感悟、魔道、遗迹、情义、欲望等多种类型
 - ✨ **9维性格分析**：基于回答计算性格向量（决断、勇气、诚信、善良等）
 - ✨ **智能匹配奖励**：根据性格匹配度给予三级奖励（完美契合/良好匹配/普通匹配）
 - ✨ **13个问道包**：机缘2个、感悟2个、魔道2个、遗迹2个、情义2个、欲望3个
-- 测试命令：`修仙.机缘`、`修仙.感悟`、`修仙.心魔`、`修仙.遗迹`、`修仙.情义`、`修仙.欲望`
-- `修仙.问道包统计` - 查看问道包系统统计
-- `修仙.问道包列表 [tag]` - 查看指定类型的问道包
+- 开发者测试命令（需启用 enableDevTools）：
+  - `机缘`、`感悟`、`心魔`、`遗迹`、`情义`、`欲望` - 测试对应问道包
+  - `问道包统计` - 查看问道包系统统计
+  - `问道包列表` - 查看所有问道包
+  - `问心列表` - 查看所有问心路径
 
 **AI集成（ChatLuna）**
 - ✅ 真实 ChatLuna API 调用（智谱 GLM-4-Flash）
@@ -50,13 +100,33 @@
 - **伪灵根**：无加成
 - **隐藏灵根**：哈根（修炼+100%，突破+15%，战力+50%）
 
-**开发者工具（v0.9.1新增）**
-- `修仙.测试灵根 [次数]` - 模拟灵根分配测试（默认100次，最大1000次）
-- `修仙.查看统计` - 查看当前所有玩家的实际灵根分布
-- `修仙.重置统计` - 重置灵根统计数据
-- `修仙.清理玩家 <用户ID>` - 删除指定玩家的所有数据
-- `修仙.测试性格 <答案>` - 测试性格分析结果
-- ⚠️ 需要在插件配置中启用「开发者工具」，默认禁用
+**开发者工具（需启用 enableDevTools）**
+
+灵根统计相关：
+- `测试灵根 [次数]` - 模拟灵根分配测试（默认100次，最大1000次）
+- `查看统计` - 查看当前所有玩家的实际灵根分布
+- `同步统计` - 从玩家表重新统计灵根分布
+- `重置统计` - 重置灵根统计数据
+- `测试性格 <答案>` - 测试性格分析结果
+
+Buff管理相关：
+- `查看buff @玩家` - 查看玩家所有buff（可省略@查看自己）
+- `添加buff @玩家 <类型> <数值> [小时]` - 给玩家添加buff
+- `删除buff <buffId>` - 删除指定buff
+- `清空buff @玩家` - 清空玩家所有buff
+- `清理过期buff` - 手动清理过期buff
+- `buff统计` - 查看系统buff统计
+
+问道包测试相关：
+- `机缘`、`感悟`、`心魔`、`遗迹`、`情义`、`欲望` - 测试对应问道包
+- `问道包统计` - 查看问道包完成统计
+- `问道包列表` - 查看所有问道包
+- `问心列表` - 查看所有问心路径
+
+玩家管理相关：
+- `清理玩家 @玩家` - 删除指定玩家的所有数据（包括问心、buff记录）
+
+⚠️ 需要在插件配置中启用「开发者工具」，默认禁用
 
 ### 境界系统
 
@@ -107,9 +177,19 @@ plugins:
       - - YOUR_API_KEY_HERE
 
   xiuxian-txl:
-    model: zhipu/GLM-4-Flash     # 选择使用的 AI 模型
-    enableFallback: false         # AI 降级开关（false=防作弊模式）
+    model: zhipu/GLM-4-Flash        # 选择使用的 AI 模型
+    enableFallback: false            # AI 降级开关（false=防作弊模式）
+    enableDevTools: false            # 开发者工具（默认禁用，生产环境建议保持禁用）
 ```
+
+**配置说明**：
+- `model`: AI模型选择，支持所有ChatLuna模型
+- `enableFallback`: AI评分降级开关，false为防作弊模式
+- `enableDevTools`: 开发者工具开关，启用后可使用测试命令和buff管理命令
+
+**v1.1.0 新增配置常量**（位于 `src/config/constants.ts`）：
+- `GLOBAL_COOLDOWN_HOURS`: 全局冷却时间（小时），默认72小时
+- `ENABLE_AFFINITY_BONUS`: 是否启用灵根亲和度加成，默认true
 
 注：开发阶段不再使用 `npm link` 方式，以免引发跨盘/路径解析问题。
 
@@ -332,17 +412,22 @@ koishi-plugin-xiuxian-txl/
 │   │   ├── player.service.ts    # 玩家服务（✅完全解耦）
 │   │   ├── questioning.service.ts # 问心服务（🔄部分解耦）
 │   │   ├── path-package.service.ts  # 问道包管理服务（✅完全解耦）
-│   │   └── root-stats.service.ts    # 灵根统计服务（✅完全解耦）
+│   │   ├── root-stats.service.ts    # 灵根统计服务（✅完全解耦）
+│   │   ├── buff.service.ts      # Buff服务（v1.0.0新增，✅完全解耦）
+│   │   └── bonus-calculator.service.ts # 加成计算服务（v1.0.0新增，✅完全解耦）
 │   ├── commands/                # 命令层
 │   │   ├── index.ts
 │   │   ├── player.ts            # 步入仙途、天道记录
 │   │   ├── cultivation.ts       # 打坐、突破
 │   │   ├── questioning.ts       # 问心相关命令 ✨
-│   │   └── package-test.ts      # 问道包测试命令 ✨
+│   │   ├── dev-test.ts          # 开发者测试命令（v0.9.1新增）
+│   │   ├── dev-buff.ts          # Buff管理命令（v1.0.0新增）
+│   │   └── dev-package.ts       # 问道包测试命令（v1.0.1新增）
 │   ├── utils/                   # 工具层
 │   │   ├── calculator.ts        # 战力、速度计算
 │   │   ├── formatter.ts         # 格式化工具
 │   │   ├── random.ts            # 随机工具
+│   │   ├── common-helpers.ts    # 通用辅助函数（v1.0.1新增）
 │   │   ├── ai-helper.ts         # AI 辅助工具 ✨
 │   │   ├── fate-calculator.ts   # 天命计算器 ✨
 │   │   ├── personality-analyzer.ts # 性格分析器 ✨
@@ -353,6 +438,7 @@ koishi-plugin-xiuxian-txl/
 │       ├── player.ts
 │       ├── questioning.ts       # 问心相关接口 ✨
 │       ├── path-package.ts      # 问道包类型定义 ✨
+│       ├── buff.ts              # Buff类型定义（v1.0.0新增）
 │       └── ai-response.ts       # AI响应类型 ✨
 └── lib/                         # 编译输出
 ```
@@ -377,38 +463,183 @@ koishi-plugin-xiuxian-txl/
 
 ## 最近变更
 
+### 2025-01-22 - v1.1.0 问道守心系统修复与优化
+
+**关键Bug修复**
+- ✅ **境界检查失效修复**：修复0级炼气玩家触发金丹包（realm=3）的严重bug
+  - 根因：错误使用测试方法 `startPackageByTagTest` 跳过了所有检查
+  - 修复：改用正式方法 `startPackageByTag`，传入玩家对象进行完整检查
+- ✅ **日志输出修复**：日志完全不显示的问题
+  - 根因：测试方法跳过了包含日志的代码路径
+  - 优化：将关键日志从 debug 改为 info 级别，确保默认可见
+- ✅ **冷却机制重构**：8小时冷却限制未生效
+  - 旧逻辑：复杂的数据库查询判断包类型（已废弃）
+  - 新逻辑：在玩家表新增 `lastQuestioningTime` 字段，直接限制命令本身
+
+**冷却机制说明**
+- **命令级冷却**：限制的是"问道守心"命令本身，而非特定问道包
+- **实现方式**：
+  1. 完成问道守心时更新 `player.lastQuestioningTime`
+  2. 触发命令时检查此字段，8小时内拒绝
+  3. 不再区分包类型，所有问道包共享冷却
+- **涉及文件**：
+  - `src/database/models/player.ts` - 新增数据库字段
+  - `src/types/player.ts` - 新增类型定义
+  - `src/services/questioning.service.ts:739-755` - 冷却检查
+  - `src/services/questioning.service.ts:959-962` - 更新完成时间
+
+**问道包管理系统**
+- ✅ **数据库表**：新建 `xiuxian_path_packages_v3` 存储包信息和统计
+- ✅ **自动同步**：插件启动时自动同步问道包到数据库
+- ✅ **统计功能**：记录每个包的触发和完成次数
+- ✅ **管理命令**：
+  - `问道包管理` - 查看所有包的状态和统计
+  - `问道包启用 <包ID>` - 动态启用指定包
+  - `问道包禁用 <包ID>` - 动态禁用指定包
+
+**代码质量优化**
+- ✅ **删除错误代码**：清理基于错误理解的 `checkGlobalCooldown` 方法
+- ✅ **统一检查逻辑**：所有冷却逻辑集中在 `startPackageByTag` 中
+- ✅ **简化判断**：不再依赖复杂的数据库查询，直接使用玩家字段
+- ✅ **日志优化**：关键日志改为 info 级别，便于问题排查
+
+**修改文件**：
+- `src/commands/questioning.ts:70` - 修复代码路径
+- `src/database/models/player.ts:48` - 新增 lastQuestioningTime 字段
+- `src/types/player.ts:39` - 新增类型定义
+- `src/types/path-package-db.ts` - 新建问道包数据库类型
+- `src/database/models/path-package.ts` - 新建问道包表模型
+- `src/services/path-package.service.ts` - 新增数据库管理方法
+- `src/services/questioning.service.ts` - 简化冷却检查逻辑
+- `src/commands/dev-package.ts` - 新增管理命令
+
+**详细文档**：见 `MEMORY.md` v1.1.0 章节
+
+---
+
+### 2025-11-22 - v1.0.1 命令系统优化与交互增强
+
+**命令别名支持**
+- ✅ **省略前缀**：所有命令支持省略 `修仙.` 前缀
+  - 示例：`天道记录`、`打坐 2`、`突破` 等直接使用
+  - 保持兼容：`修仙 天道记录` 仍然有效
+- ✅ **统一实现**：使用 `.alias()` 方法为每个命令添加别名
+
+**@ 功能扩展**
+- ✅ **查看其他玩家**：支持通过@提及查看他人信息
+  - `天道记录 @玩家` - 查看其他玩家修仙信息和buff加成
+  - `问心历史 @玩家` - 查看其他玩家问心历史
+  - `查看buff @玩家` - 查看其他玩家buff（开发者权限）
+- ✅ **代码复用**：提取 `extractMentionedUserId()` 工具函数
+
+**突破机制优化**
+- ✅ **区分小境界和大境界**：
+  - 小境界突破（初期→中期→后期→大圆满）：100%成功，修为保留
+  - 大境界突破（练气→筑基→...）：概率成功，修为清零（成功或失败均清零）
+- ✅ **动态检测**：使用 `REALM_LEVELS.length - 1` 动态判断，支持未来扩展
+
+**命令整合**
+- ✅ **开发者命令重组**：
+  - 创建 `dev-package.ts` 整合9个问道包测试命令和问心列表
+  - 删除 `修仙.取消问心` 命令（用户体验优化）
+  - 移除 `修仙.问心列表`（迁移至开发者工具）
+- ✅ **代码清理**：删除 `package-test.ts`，统一命令注册
+
+**修改文件**：
+- `src/services/player.service.ts` - 突破逻辑重构（lines 224-342）
+- `src/utils/common-helpers.ts` - 新增工具函数
+- `src/commands/player.ts` - 添加别名和@功能
+- `src/commands/cultivation.ts` - 添加别名
+- `src/commands/questioning.ts` - 删除命令、添加别名和@功能
+- `src/commands/dev-test.ts`、`dev-buff.ts` - 添加别名、使用common-helpers
+- `src/commands/dev-package.ts` - 新增文件（迁移问道包测试命令）
+- `src/commands/index.ts` - 更新命令注册
+
+---
+
+### 2025-11-22 - v1.0.0 Buff系统
+
+**核心功能**
+- ✅ **Buff系统**：支持修炼速度、突破率、修为需求三大类加成（战力、灵石收益预留）
+- ✅ **加成公式**：
+  - 修炼倍率 = (全局+永久) × 灵根 × (1+临时)
+  - 突破率 = (全局+永久+灵根) + 临时
+  - 所需修为 = 设定 × (1+永久+临时)
+- ✅ **自动清理**：每小时清理过期buff
+- ✅ **堆叠控制**：支持buff堆叠和最大堆叠数限制
+- ✅ **多来源支持**：宗门、道具、特殊事件、全局活动等
+
+**数据库变更**
+- ✅ **xiuxian_player_v3 新增字段**：
+  - `permanentCultivationBonus` - 永久修炼加成（倍率）
+  - `permanentBreakthroughBonus` - 永久突破加成（百分比）
+  - `permanentCombatPowerBonus` - 永久战力加成（倍率）
+  - `permanentSpiritStoneBonus` - 永久灵石收益加成（倍率）
+  - `permanentCultivationRequirement` - 永久修为需求倍率
+- ✅ **xiuxian_buff_v3 新表**：
+  - buffType、buffSource、sourceId、value、isMultiplier
+  - startTime、endTime、stackable、maxStacks、description
+
+**新增服务**
+- ✅ **BuffService**：buff增删查、自动清理、堆叠控制
+- ✅ **BonusCalculatorService**：加成计算、公式封装、详情查询
+
+**开发者命令**（需启用 enableDevTools）
+- `修仙.查看buff @玩家` - 查看玩家所有buff（支持@提及）
+- `修仙.添加buff @玩家 <类型> <数值> [小时]` - 添加buff
+- `修仙.删除buff <buffId>` - 删除指定buff
+- `修仙.清空buff @玩家` - 清空玩家所有buff
+- `修仙.清理过期buff` - 手动清理过期buff
+- `修仙.buff统计` - 查看系统buff统计
+
+**修改文件**：
+- `src/services/buff.service.ts` - 新增buff服务
+- `src/services/bonus-calculator.service.ts` - 新增加成计算服务
+- `src/services/player.service.ts` - 集成buff系统
+- `src/types/buff.ts` - buff类型定义
+- `src/commands/dev-buff.ts` - 新增buff管理命令
+- `src/database/models/player.ts` - 新增永久加成字段
+- `src/database/models/buff.ts` - 新增buff表
+
+**详细说明**：见上方"Buff系统（v1.0.0新增）"和"数据库表结构"章节
+
+---
+
 ### 2025-11-21 - v0.9.1 命令整理与开发工具
+
+> **注意**：此版本的命令已在 v1.0.1 中进一步优化，新增别名支持并删除部分命令
 
 **命令前缀统一**
 - ✅ **统一命名**：所有命令改为 `修仙.xxx` 格式，在 Koishi 指令管理面板统一显示
 - ✅ **父命令**：新增 `修仙` 父命令，所有子命令自动分组
 - ✅ **影响命令**：
-  - `步入仙途` → `修仙.步入仙途`
-  - `天道记录` → `修仙.天道记录`
-  - `打坐` → `修仙.打坐`
-  - `突破` → `修仙.突破`
-  - `问心` → `修仙.问心`
-  - `问心列表` → `修仙.问心列表`
-  - `取消问心` → `修仙.取消问心`
-  - `问心历史` → `修仙.问心历史`
+  - `步入仙途` → `修仙.步入仙途`（v1.0.1新增别名支持）
+  - `天道记录` → `修仙.天道记录`（v1.0.1新增别名支持）
+  - `打坐` → `修仙.打坐`（v1.0.1新增别名支持）
+  - `突破` → `修仙.突破`（v1.0.1新增别名支持）
+  - `问心` → `修仙.问心`（v1.0.1新增别名支持）
+  - `问心历史` → `修仙.问心历史`（v1.0.1新增别名支持和@功能）
+  - ~~`问心列表` → `修仙.问心列表`~~（v1.0.1已删除，迁移至开发者工具）
+  - ~~`取消问心` → `修仙.取消问心`~~（v1.0.1已删除）
 
 **开发者工具**（需在配置中启用）
 - ✅ **配置开关**：在插件配置面板新增「开发者工具」部分
 - ✅ **测试命令**：
-  - `修仙.测试灵根 [次数]` - 模拟灵根分配测试（默认100次，最大1000次）
-  - `修仙.查看统计` - 查看当前所有玩家的实际灵根分布
-  - `修仙.重置统计` - 重置灵根统计数据
-  - `修仙.清理玩家 <用户ID>` - 删除指定玩家的所有数据
-  - `修仙.测试性格 <答案>` - 测试性格分析结果
+  - `修仙.测试灵根 [次数]` - 模拟灵根分配测试（v1.0.1新增别名支持）
+  - `修仙.查看统计` - 查看当前所有玩家的实际灵根分布（v1.0.1新增别名支持）
+  - `修仙.同步统计` - 从玩家表重新统计灵根分布（v1.0.1新增别名支持）
+  - `修仙.重置统计` - 重置灵根统计数据（v1.0.1新增别名支持）
+  - `修仙.清理玩家 @玩家` - 删除指定玩家的所有数据（v1.0.1改用@提及）
+  - `修仙.测试性格 <答案>` - 测试性格分析结果（v1.0.1新增别名支持）
 - ✅ **安全设计**：默认禁用，避免污染生产环境
 
 **修改文件**：
 - `src/commands/index.ts` - 父命令定义 + 开发工具条件注册
-- `src/commands/player.ts` - 2个命令前缀修改
-- `src/commands/cultivation.ts` - 2个命令前缀修改
-- `src/commands/questioning.ts` - 4个命令前缀修改
+- `src/commands/player.ts` - 2个命令前缀修改（v1.0.1新增别名和@功能）
+- `src/commands/cultivation.ts` - 2个命令前缀修改（v1.0.1新增别名）
+- `src/commands/questioning.ts` - 4个命令前缀修改（v1.0.1删除2个命令并新增别名和@功能）
 - `src/index.ts` - 开发工具配置
-- `src/commands/dev-test.ts` - 新增开发者测试命令（243行）
+- `src/commands/dev-test.ts` - 新增开发者测试命令（v1.0.1新增别名）
 
 **详细文档**：`.claude/v0.9.1-命令整理与开发工具.md`
 
@@ -511,11 +742,17 @@ koishi-plugin-xiuxian-txl/
 | cultivationMax | unsigned | 突破所需修为 |
 | spiritStone | unsigned | 灵石 |
 | spiritualRoot | string | 灵根类型（light/dark/metal/wood/water/fire/earth/qi/pseudo/ha） |
+| initialSpiritualRoot | string | 初始灵根（用于统计，不可变） |
 | combatPower | unsigned | 战力 |
 | status | string | 状态 |
 | statusEndTime | timestamp | 状态结束时间 |
 | sectId | unsigned | 宗门ID |
 | sectContribution | unsigned | 宗门贡献 |
+| permanentCultivationBonus | number | 永久修炼加成（倍率，v1.0.0新增） |
+| permanentBreakthroughBonus | number | 永久突破加成（百分比，v1.0.0新增） |
+| permanentCombatPowerBonus | number | 永久战力加成（倍率，v1.0.0新增） |
+| permanentSpiritStoneBonus | number | 永久灵石收益加成（倍率，v1.0.0新增） |
+| permanentCultivationRequirement | number | 永久修为需求倍率（v1.0.0新增） |
 | createTime | timestamp | 创建时间 |
 | lastActiveTime | timestamp | 最后活跃时间 |
 | totalCombatWin | unsigned | 总胜场 |
@@ -548,6 +785,23 @@ koishi-plugin-xiuxian-txl/
 | rootType | string | 灵根类型 |
 | count | unsigned | 分配次数 |
 | lastUpdateTime | timestamp | 最后更新时间 |
+
+**xiuxian_buff_v3** - Buff数据表（v1.0.0新增）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | unsigned | 主键（自增） |
+| userId | string | 用户ID |
+| buffType | string | Buff类型（cultivation_speed/breakthrough_rate/cultivation_requirement等） |
+| buffSource | string | Buff来源（sect/item/special/global） |
+| sourceId | string | 来源ID（用于标识具体的宗门、物品等） |
+| value | number | 加成数值 |
+| isMultiplier | boolean | 是否为倍率（true为倍率，false为固定值） |
+| startTime | timestamp | 生效时间 |
+| endTime | timestamp | 过期时间（null表示永久） |
+| stackable | boolean | 是否可堆叠 |
+| maxStacks | unsigned | 最大堆叠数 |
+| description | string | Buff描述 |
 
 ## 开发工作流
 

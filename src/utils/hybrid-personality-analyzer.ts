@@ -8,7 +8,7 @@
 import { Context } from 'koishi'
 import { PersonalityScore, analyzePersonality } from './personality-analyzer'
 import { AIOpenQuestionScorer, AIOpenQuestionScore } from './ai-open-question-scorer'
-import { Question } from '../config/questioning'
+import { Question } from '../types/path-package'
 import { AIConfig } from '../config/constants'
 
 /**

@@ -1,6 +1,10 @@
 /**
  * 问道包 - 情义抉择
  * 考察玩家对友情、亲情、爱情的态度
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除单个包冷却时间，改用全局冷却
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -11,10 +15,12 @@ export const bondPackages: PathPackageTemplate[] = [
     name: '故友之约',
     description: '昔日好友陷入危机，向你求助，但帮助他可能会让你陷入困境',
     tags: ['bond', 'trial'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.15,
+
     triggerConditions: {
-      minRealm: 1,           // 练气期
-      cooldownHours: 72,     // 3天冷却
-      triggerChance: 0.15    // 15%触发率
+      minRealm: 1           // 筑基期
     },
 
     // ✨ v0.8.2 新增：评分权重配置（使用默认权重）
@@ -107,11 +113,33 @@ export const bondPackages: PathPackageTemplate[] = [
     name: '血脉羁绊',
     description: '家族遭遇危机，你必须在修炼与家族责任之间做出选择',
     tags: ['bond'],
+
+    // v1.1.0 移到外层
+    triggerChance: 0.12,
+
     triggerConditions: {
-      minRealm: 2,
-      cooldownHours: 96,     // 4天冷却
-      triggerChance: 0.12    // 12%触发率
+      minRealm: 2
     },
+
+    // ✨ v1.1.0 评分权重配置
+    scoringWeights: {
+      choiceWeight: 0.3,
+      openWeight: 0.7
+    },
+
+    // ✨ v1.1.0 AI功能配置
+    aiFeatures: {
+      enableScoring: true,
+      enableEvaluation: true
+    },
+
+    // ✨ v1.1.0 AI评分配置
+    aiScoringConfig: {
+      openQuestionIndices: [2],
+      maxScorePerDimension: 8,
+      minScorePerDimension: -3
+    },
+
     questions: [
       {
         id: 'q1',
@@ -138,7 +166,9 @@ export const bondPackages: PathPackageTemplate[] = [
       {
         id: 'q3',
         type: 'text',
-        question: '修仙本就是逆天而行的孤独之路。你认为修士应该保留凡心的羁绊，还是斩断一切红尘情丝？为什么？'
+        question: '修仙本就是逆天而行的孤独之路。你认为修士应该保留凡心的羁绊，还是斩断一切红尘情丝？为什么？',
+        // ✨ v1.1.0 AI评分提示
+        aiHint: '评估修士对凡心羁绊与修行的态度。识别是否重视情义（kindness高、honesty高）、冷酷绝情（kindness低、greed高）、真诚权衡（honesty高、stability高）还是敷衍了事（impatience高）。检测作弊行为。'
       }
     ],
     optimalScore: {

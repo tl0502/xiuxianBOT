@@ -1,6 +1,10 @@
 /**
  * 步入仙途问道包
  * 新玩家踏入修仙世界时的初心问询
+ *
+ * v1.1.0 更新：
+ * - triggerChance 移到外层
+ * - 删除冷却时间
  */
 
 import { PathPackageTemplate } from '../../types/path-package'
@@ -17,10 +21,12 @@ export const initiationPackages: PathPackageTemplate[] = [
     name: '踏入仙途·初心之问',
     description: '天道感知你的初心，将为你指引前路',
     tags: ['initiation'],
+
+    // v1.1.0 移到外层
+    triggerChance: 1.0,
+
     triggerConditions: {
-      minRealm: 0,           // 无境界要求
-      cooldownHours: 0,       // 无冷却时间
-      triggerChance: 1.0      // 100% 触发（随机选择其中一个）
+      minRealm: 0           // 无境界要求
     },
 
     // ✨ v0.6.0 启用AI评分（第3题开放题）
@@ -71,10 +77,12 @@ export const initiationPackages: PathPackageTemplate[] = [
     name: '踏入仙途·本性之辨',
     description: '本性难移，天道将观你真我',
     tags: ['initiation'],
+
+    // v1.1.0 移到外层
+    triggerChance: 1.0,
+
     triggerConditions: {
-      minRealm: 0,
-      cooldownHours: 0,
-      triggerChance: 1.0
+      minRealm: 0
     },
 
     requiresAI: true,
@@ -122,10 +130,12 @@ export const initiationPackages: PathPackageTemplate[] = [
     name: '踏入仙途·命运之择',
     description: '命运交织，选择决定你的仙途',
     tags: ['initiation'],
+
+    // v1.1.0 移到外层
+    triggerChance: 1.0,
+
     triggerConditions: {
-      minRealm: 0,
-      cooldownHours: 0,
-      triggerChance: 1.0
+      minRealm: 0
     },
 
     requiresAI: true,

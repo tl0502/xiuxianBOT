@@ -1,18 +1,10 @@
-import { Context, h } from 'koishi'
+import { Context } from 'koishi'
 import { FateCalculator } from '../utils/fate-calculator'
 import { analyzePersonality, PersonalityScore } from '../utils/personality-analyzer'
 import { KoishiAppContext } from '../adapters/koishi'
 import { RootStatsService } from '../services/root-stats.service'
 import { atMessage } from '../utils/formatter'
-
-/**
- * 从消息元素中提取@提及的用户ID
- */
-function extractMentionedUserId(session: any): string | null {
-  if (!session?.elements) return null
-  const atElements = h.select(session.elements, 'at')
-  return atElements.length > 0 ? atElements[0].attrs.id : null
-}
+import { extractMentionedUserId } from '../utils/common-helpers'
 
 /**
  * 注册开发者测试命令
@@ -25,7 +17,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 测试灵根分布
    */
-  ctx.command('修仙.测试灵根 [count:number]', '测试灵根概率分布（开发者）')
+  ctx.command('修仙/测试灵根 [count:number]', '测试灵根概率分布（开发者）')
+    .alias('测试灵根')
     .usage('测试灵根 [次数] - 默认100次')
     .example('测试灵根 500  // 模拟500次灵根分配')
     .action(async ({ session }, count = 100) => {
@@ -86,7 +79,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 查看当前灵根统计
    */
-  ctx.command('修仙.查看统计', '查看当前灵根分布统计（开发者）')
+  ctx.command('修仙/查看统计', '查看当前灵根分布统计（开发者）')
+    .alias('查看统计')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -140,7 +134,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 同步统计（从玩家表重新统计）
    */
-  ctx.command('修仙.同步统计', '从玩家表重新统计灵根分布（开发者）')
+  ctx.command('修仙/同步统计', '从玩家表重新统计灵根分布（开发者）')
+    .alias('同步统计')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -156,7 +151,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 重置灵根统计
    */
-  ctx.command('修仙.重置统计', '重置灵根分布统计（开发者）')
+  ctx.command('修仙/重置统计', '重置灵根分布统计（开发者）')
+    .alias('重置统计')
     .action(async ({ session }) => {
       if (!session?.userId) return '系统错误：无法获取用户信息'
 
@@ -172,7 +168,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 清理测试玩家
    */
-  ctx.command('修仙.清理玩家', '删除指定玩家数据（开发者）')
+  ctx.command('修仙/清理玩家', '删除指定玩家数据（开发者）')
+    .alias('清理玩家')
     .usage('修仙.清理玩家 @玩家')
     .example('修仙.清理玩家 @张三')
     .action(async ({ session }) => {
@@ -203,7 +200,8 @@ export function registerDevTestCommands(ctx: Context) {
   /**
    * 测试性格分析
    */
-  ctx.command('修仙.测试性格 <answers:text>', '测试性格分析结果（开发者）')
+  ctx.command('修仙/测试性格 <answers:text>', '测试性格分析结果（开发者）')
+    .alias('测试性格')
     .usage('测试性格 <答案1,答案2,答案3>')
     .example('测试性格 A,B,我选择帮助他人')
     .action(async ({ session }, answers) => {
