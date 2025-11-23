@@ -338,55 +338,17 @@ export class PathPackageService {
   }
 
   /**
-   * 检查冷却时间（v1.1.0 已废弃，单包冷却改为全局冷却）
-   * @deprecated 请使用 checkGlobalCooldown 方法
-   */
-  async checkCooldown(userId: string, packageId: string): Promise<{
-    canUse: boolean
-    remainingHours?: number
-  }> {
-    const pkg = this.getById(packageId)
-    if (!pkg || !pkg.triggerConditions.cooldownHours) {
-      return { canUse: true }
-    }
-
-    // 查询最近一次该问道包的记录
-    const records = await this.context.database.get<any>('xiuxian_questioning_v3', {
-      userId,
-      pathId: packageId
-    } as any, {
-      sort: { createTime: 'desc' },
-      limit: 1
-    })
-
-    if (records.length === 0) {
-      return { canUse: true }
-    }
-
-    const lastTime = new Date(records[0].createTime).getTime()
-    const now = Date.now()
-    const cooldownMs = pkg.triggerConditions.cooldownHours * 60 * 60 * 1000
-    const elapsed = now - lastTime
-
-    if (elapsed < cooldownMs) {
-      const remainingHours = Math.ceil((cooldownMs - elapsed) / (60 * 60 * 1000))
-      return { canUse: false, remainingHours }
-    }
-
-    return { canUse: true }
-  }
-
-  /**
-   * 基于灵根亲和度选择问道包（v1.1.0 新增）
-   * 根据玩家的灵根类型，提升特定问道包的触发概率，然后归一化并加权随机选择
+   * 基于命令配置和灵根亲和度选择问道包（v1.2.0 重构）
+   *
+   * 流程：命令tag筛选 → 权限检查 → 亲和度加成（tag级+包ID级叠加）→ 归一化 → 随机选择
    *
    * @param player 玩家对象（需要包含 spiritualRoot 字段）
-   * @param excludeTags 要排除的标签（例如 ['initiation']）
+   * @param commandConfig 命令配置（allowedTags + excludeTags）
    * @returns 选中的问道包，如果没有可用包则返回 null
    */
   async selectPackageWithAffinity(
     player: any,
-    excludeTags: PathPackageTag[] = ['initiation']
+    commandConfig: { allowedTags?: string[], excludeTags?: string[] } = {}
   ): Promise<PathPackageTemplate | null> {
     // 导入配置
     const { PathPackageConfig } = await import('../config/constants.js')
@@ -395,18 +357,33 @@ export class PathPackageService {
     // ✨ 关键日志：记录玩家境界信息
     this.context.logger.info(`[问道包筛选] 玩家境界: realm=${player.realm}, realmLevel=${player.realmLevel}, 灵根: ${player.spiritualRoot}`)
 
-    // 获取所有问道包（排除 initiation 等指定标签）
+    // 获取所有问道包
     const allPackages = this.getAll()
     this.context.logger.info(`[问道包筛选] 总包数: ${allPackages.length}`)
 
-    // ✨ 关键日志：记录每个包的筛选结果
-    const candidatePackages = allPackages.filter(pkg => {
-      // 排除指定标签的包
-      if (excludeTags.some(tag => pkg.tags.includes(tag))) {
-        this.context.logger.info(`[问道包筛选] 排除 ${pkg.name} (标签: ${pkg.tags.join(', ')})`)
-        return false
+    // ✨ 第一步：命令tag筛选
+    let candidatePackages = allPackages.filter(pkg => {
+      // 白名单检查：如果配置了 allowedTags，包必须包含其中至少一个
+      if (commandConfig.allowedTags && commandConfig.allowedTags.length > 0) {
+        if (!pkg.tags.some(tag => commandConfig.allowedTags!.includes(tag))) {
+          this.context.logger.info(`[问道包筛选] 排除 ${pkg.name} (不在允许标签中)`)
+          return false
+        }
       }
-      // 检查触发条件
+
+      // 黑名单检查：如果配置了 excludeTags，包不能包含其中任何一个
+      if (commandConfig.excludeTags && commandConfig.excludeTags.length > 0) {
+        if (pkg.tags.some(tag => commandConfig.excludeTags!.includes(tag))) {
+          this.context.logger.info(`[问道包筛选] 排除 ${pkg.name} (标签: ${pkg.tags.join(', ')})`)
+          return false
+        }
+      }
+
+      return true
+    })
+
+    // ✨ 第二步：权限检查
+    candidatePackages = candidatePackages.filter(pkg => {
       const passed = this.checkTriggerConditions(pkg.triggerConditions, player)
       if (!passed) {
         this.context.logger.info(`[问道包筛选] 不满足条件: ${pkg.name} (minRealm=${pkg.triggerConditions.minRealm ?? 'none'})`)
@@ -427,22 +404,38 @@ export class PathPackageService {
       return this.weightedRandomSelect(candidatePackages)
     }
 
-    // 读取玩家灵根的亲和度配置
+    // ✨ 第三步：读取玩家灵根的亲和度配置
     const { SPIRITUAL_ROOT_REGISTRY } = await import('../config/spiritual-root-registry.js')
     const rootConfig = SPIRITUAL_ROOT_REGISTRY[player.spiritualRoot as keyof typeof SPIRITUAL_ROOT_REGISTRY]
     const affinities = rootConfig?.packageAffinities || []
 
-    // 构建亲和度映射表
-    const affinityMap = new Map<string, number>()
-    for (const affinity of affinities) {
-      affinityMap.set(affinity.packageId, affinity.bonusChance)
-    }
-
-    // 计算每个包的最终概率（基础概率 + 亲和度加成）
+    // ✨ 第四步：计算每个包的最终概率（基础 + tag级亲和度 + 包ID级亲和度）
     const packagesWithProbability = candidatePackages.map(pkg => {
       const baseChance = pkg.triggerChance
-      const affinityBonus = affinityMap.get(pkg.id) || 0
-      const finalChance = baseChance + affinityBonus
+
+      // 1. 计算tag级亲和度（一个包可能匹配多个tag，全部叠加）
+      let tagAffinityBonus = 0
+      for (const affinity of affinities) {
+        if (affinity.tag && pkg.tags.includes(affinity.tag)) {
+          tagAffinityBonus += affinity.bonusChance
+        }
+      }
+
+      // 2. 计算包ID级亲和度
+      let pkgAffinityBonus = 0
+      for (const affinity of affinities) {
+        if (affinity.packageId === pkg.id) {
+          pkgAffinityBonus = affinity.bonusChance
+          break
+        }
+      }
+
+      // 3. 叠加：基础 + tag级 + 包ID级
+      const finalChance = baseChance + tagAffinityBonus + pkgAffinityBonus
+
+      if (tagAffinityBonus > 0 || pkgAffinityBonus > 0) {
+        this.context.logger.debug(`[亲和度] ${pkg.name}: 基础=${baseChance}, tag级=${tagAffinityBonus}, ID级=${pkgAffinityBonus}, 最终=${finalChance}`)
+      }
 
       return {
         package: pkg,
@@ -450,7 +443,7 @@ export class PathPackageService {
       }
     })
 
-    // 归一化概率（确保总和为1）
+    // ✨ 第五步：归一化概率（确保总和为1）
     const totalProbability = packagesWithProbability.reduce((sum, item) => sum + item.probability, 0)
 
     if (totalProbability === 0) {
@@ -464,7 +457,7 @@ export class PathPackageService {
       probability: item.probability / totalProbability
     }))
 
-    // 加权随机选择
+    // ✨ 第六步：加权随机选择
     const random = Math.random()
     let accumulated = 0
 

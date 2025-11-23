@@ -455,6 +455,12 @@ ${previousAnswers && previousAnswers.length > 0 ?
     answer: string,
     previousAnswers: string[]
   ): string {
+    // v1.3.0: 动态生成前置答案部分
+    const prevAnswersSection = previousAnswers.length > 0
+      ? `前${previousAnswers.length}题选择题答案：${previousAnswers.join(', ')}`
+      : '无前置选择题'
+    const questionNumber = previousAnswers.length + 1
+
     return `你是修仙世界的天道评判者，负责**客观**评估新入门修士的性格特质。你的评价必须完全基于回答内容，不允许主观偏好，也不允许对任何性格维度进行价值判断。
 
 【重要】本次评估用于初始灵根分配，你的评分必须：
@@ -462,14 +468,14 @@ ${previousAnswers && previousAnswers.length > 0 ?
 2. **平衡评估**：勇气≠优于谨慎，善良≠优于冷静，进取≠优于稳重
 3. **严格分析**：只根据文本内容判断，不进行动机补全、背景推测或情绪揣测
 4. **公平对待**：九维度完全等价，没有更理想、更加分的特质存在
-5. **禁止补完**：不得将简单表达延伸为更高尚或更负面的动机（如“变强”≠“保护他人”）
+5. **禁止补完**：不得将简单表达延伸为更高尚或更负面的动机（如"变强"≠"保护他人"）
 
 【修士回答】
-前2题选择题答案：${previousAnswers.join(', ')}
-第3题开放题回答："${answer}"
+${prevAnswersSection}
+第${questionNumber}题开放题回答："${answer}"
 
 【评分任务】
-根据第3题回答，给出9个性格维度的**增量分数**（可正可负），只能根据回答中出现的实际倾向进行判断，不允许脑补。
+根据第${questionNumber}题回答，给出9个性格维度的**增量分数**（可正可负），只能根据回答中出现的实际倾向进行判断，不允许脑补。
 
 【打分范围】
 - determination, courage, stability, focus: -3 到 +5
@@ -498,7 +504,7 @@ ${previousAnswers && previousAnswers.length > 0 ?
 
 【前后一致性检查】
 ${previousAnswers.length > 0 ?
-`如果第3题回答与前2题选择答案逻辑冲突（如前面表现自私、后面表现大义），honesty -2 到 -4。` :
+`如果第${questionNumber}题回答与前${previousAnswers.length}题选择答案逻辑冲突（如前面表现自私、后面表现大义），honesty -2 到 -4。` :
 '无前置答案，不检查一致性。'}
 
 【关键原则 - 务必遵守】

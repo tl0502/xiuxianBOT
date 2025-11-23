@@ -7,10 +7,11 @@ import { SpiritualRootType } from '../config/spiritual-roots'
 
 /**
  * 问题选项
+ * v1.3.0 更新：value改为9维打分对象
  */
 export interface QuestionOption {
   text: string
-  value: string
+  value: Partial<PersonalityScore>  // v1.3.0: 9维打分对象，例如 { kindness: 4, courage: 2 }
 }
 
 /**
@@ -37,6 +38,15 @@ export type PathPackageTag =
   | 'bond'           // 情义抉择
   | 'desire'         // 欲望试炼
   | string           // 支持自定义tag
+
+/**
+ * 命令级包配置（v1.2.0 新增）
+ * 定义命令可以触发哪些tag的包
+ */
+export interface CommandPackageConfig {
+  allowedTags?: PathPackageTag[]   // 允许的tag白名单
+  excludeTags?: PathPackageTag[]   // 排除的tag黑名单
+}
 
 /**
  * 奖励类型
@@ -138,11 +148,13 @@ export interface TriggerConditions {
 
   /**
    * 需要的道具
+    * TODO: 触发检查逻辑尚未实现，仅作为占位字段
    */
   requiredItems?: string[]
 
   /**
    * 需要完成的前置任务
+    * TODO: 触发检查逻辑尚未实现，仅作为占位字段
    */
   requiredQuests?: string[]
 

@@ -4,10 +4,6 @@ import { Player } from '../types/player'
 import { SpiritualRootType, SPIRITUAL_ROOTS } from '../config/spiritual-roots'
 import { FateCalculator } from './fate-calculator'
 import { analyzePersonality, getPersonalityDescription } from './personality-analyzer'
-import { isUsingV2, getPersonalitySystemConfig } from '../config/personality-system-config'
-import { AIPersonalityAnalyzer } from '../experimental/ai-personality-analyzer'
-import { ExtendedFateCalculator } from '../experimental/extended-fate-calculator'
-import { getRandomInitiationPath } from '../experimental/path-packages'
 import { AIConfig } from '../config/constants'
 
 /**
@@ -27,10 +23,6 @@ export class AIHelper {
    * 1. 代码量化分析性格
    * 2. 代码根据公平性算法确定灵根（天命系统）
    * 3. AI 只负责生成道号和性格评语
-   *
-   * 支持 v1.0 和 v2.0 两个版本：
-   * - v1.0: 9维性格系统 + 固定选项加分
-   * - v2.0: 22维性格系统 + AI智能解析
    */
   async generateInitiationResponse(
     _pathName: string,
@@ -39,14 +31,9 @@ export class AIHelper {
     answers: string[]
   ): Promise<InitiationAIResponse> {
     try {
-      // 检查使用哪个版本的性格系统
-      if (isUsingV2()) {
-        this.ctx.logger('xiuxian').info('使用 v2.0 性格量化系统')
-        return await this.generateInitiationResponseV2(answers)
-      } else {
-        this.ctx.logger('xiuxian').info('使用 v1.0 性格量化系统')
-        return await this.generateInitiationResponseV1(answers)
-      }
+      // v1.3.0: 直接使用9维性格系统
+      this.ctx.logger('xiuxian').info('使用 9维性格量化系统')
+      return await this.generateInitiationResponseV1(answers)
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
 
@@ -110,57 +97,6 @@ export class AIHelper {
   }
 
   /**
-   * v2.0 版本：22维性格系统 + AI智能解析
-   */
-  private async generateInitiationResponseV2(answers: string[]): Promise<InitiationAIResponse> {
-    const config = getPersonalitySystemConfig()
-
-    this.ctx.logger('xiuxian').info('调用 AI 评估步入仙途...')
-    this.ctx.logger('xiuxian').info('=== 公平性系统：代码控制灵根分配（v2.0）===')
-
-    try {
-      // 【第1步】选择问道包（如果启用多问道包）
-      const pathPackage = config.v2Config?.enableMultiplePaths
-        ? getRandomInitiationPath()
-        : null
-
-      if (pathPackage) {
-        this.ctx.logger('xiuxian').info(`选择问道包：${pathPackage.name}`)
-      }
-
-      // 【第2步】AI 性格解析（22维）
-      const analyzer = new AIPersonalityAnalyzer(this.ctx)
-      const questions = ['问题1', '问题2', '问题3']  // 实际问题会由 QuestioningService 提供
-      const personality = await analyzer.analyzePersonality(questions, answers)
-
-      // 【第3步】天命计算器确定灵根（使用 22 维系统）
-      const fateCalculator = new ExtendedFateCalculator(this.ctx)
-      const selectedRoot = await fateCalculator.selectSpiritualRoot(personality, pathPackage || undefined)
-      const rootInfo = SPIRITUAL_ROOTS[selectedRoot]
-      this.ctx.logger('xiuxian').info(`代码已确定灵根：${selectedRoot}（${rootInfo.name}）`)
-
-      // 【第4步】AI 生成道号
-      const response = await this.callChatLunaForDaoName(answers, selectedRoot, personality)
-
-      // 【第5步】解析 AI 响应并强制使用代码确定的灵根
-      const result = this.parseInitiationResponse(response, selectedRoot)
-
-      return result
-
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('v2.0 性格解析失败:', error)
-
-      // 检查是否允许降级到 v1.0
-      if (config.v2Config?.fallbackToV1) {
-        this.ctx.logger('xiuxian').warn('降级到 v1.0 系统处理')
-        return await this.generateInitiationResponseV1(answers)
-      }
-
-      throw error
-    }
-  }
-
-  /**
    * 调用 ChatLuna 生成试炼问心评估（奖励评估）
    */
   async generateQuestioningResponse(
@@ -171,12 +107,9 @@ export class AIHelper {
     _player: Player
   ): Promise<TrialAIResponse> {
     try {
-      // 构建 prompt（TODO: 当 ChatLuna 集成完成后使用）
-      // const prompt = TRIAL_AI_PROMPT...
-
       this.ctx.logger('xiuxian').info('调用 AI 评估问心结果...')
 
-      // 调用 ChatLuna（当前使用模拟响应）
+      // 调用 ChatLuna
       const response = await this.callChatLunaForTrial()
 
       // 解析 JSON 响应
@@ -233,12 +166,20 @@ export class AIHelper {
       // 获取灵根信息
       const rootInfo = SPIRITUAL_ROOTS[selectedRoot]
 
+      // v1.3.0: 动态生成修士回答部分
+      const answersSection = answers
+        .map((a, i) => {
+          const isLast = i === answers.length - 1
+          return isLast
+            ? `第${i + 1}题答案(开放题):${a}（开放性回答更能体现修士的内心）`
+            : `第${i + 1}题答案:${a}`
+        })
+        .join('\n')
+
       // 构建简化版 prompt - AI 只负责道号和评语
       const prompt =  `你是修仙世界的"天道判官",负责根据新入门修士的性格与灵根赐予【道号】与【评价】。
 【修士回答】
-第1题答案:${answers[0]}
-第2题答案:${answers[1]}
-第3题答案(开放题):${answers[2]}（开放性回答更能体现修士的内心）
+${answersSection}
 
 【性格】
 系统已量化分析修士性格：${personalityDesc}
@@ -310,107 +251,6 @@ export class AIHelper {
     // 回退到模拟响应
     this.ctx.logger('xiuxian').warn('AI 调用失败，降级使用模拟响应')
     return this.getMockInitiationResponse(answers, selectedRoot)
-  }
-
-  /**
-   * 调用 ChatLuna - 步入仙途 v2.0 模式（生成道号）
-   *
-   * v2.0 特点：基于 22 维性格评分生成道号
-   */
-  private async callChatLunaForDaoName(
-    answers: string[],
-    selectedRoot: SpiritualRootType,
-    personality: any
-  ): Promise<string> {
-    // 反作弊检测
-    this.detectCheating(answers)
-
-    // 检查 AI 服务
-    const aiService = this.ctx.xiuxianAI
-    if (!aiService || !aiService.isAvailable()) {
-      // ✨ v0.9.2 检查是否允许降级
-      const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
-      if (!enableFallback) {
-        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用降级模式')
-        throw new Error('AI服务不可用，且未启用降级模式')
-      }
-      this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
-      return this.getMockInitiationResponse(answers, selectedRoot)
-    }
-
-    try {
-      this.ctx.logger('xiuxian').info('通过 ChatLuna 调用 AI（步入仙途 v2.0）')
-
-      const rootInfo = SPIRITUAL_ROOTS[selectedRoot]
-
-      // 生成性格描述（基于22维）
-      const personalityDesc = this.generateV2PersonalityDesc(personality)
-
-      const prompt = `你是修仙世界的天道判官，负责为新入门修士赐予道号。
-
-【修士回答】
-第1题：${answers[0]}
-第2题：${answers[1]}
-第3题：${answers[2]}
-
-【性格分析（22维系统）】
-${personalityDesc}
-
-【已分配灵根】
-天道已定：${rootInfo.name}（${selectedRoot}）
-灵根特征：${rootInfo.description}
-
-【你的任务】
-生成一个深刻体现修士性格的道号（2-4个汉字），并提供评语和理由。
-
-仅返回 JSON：
-{"daoName":"道号","personality":"性格评语","reason":"分配理由"}`
-
-      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
-      if (response) {
-        this.ctx.logger('xiuxian').info('AI 响应成功（v2.0）')
-        return response
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('调用 ChatLuna 失败（v2.0）:', error)
-    }
-
-    // 降级
-    const enableFallback = this.pluginConfig?.enableInitiationAIResponseFallback ?? false
-    if (!enableFallback) {
-      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用降级模式')
-      throw new Error('AI调用失败，且未启用降级模式')
-    }
-
-    this.ctx.logger('xiuxian').warn('降级使用模拟响应')
-    return this.getMockInitiationResponse(answers, selectedRoot)
-  }
-
-  /**
-   * 生成 v2.0 性格描述（基于 22 维）
-   */
-  private generateV2PersonalityDesc(personality: any): string {
-    const traits: string[] = []
-
-    // 核心特质
-    if (personality.determination >= 7) traits.push('决断力强')
-    if (personality.courage >= 7) traits.push('勇敢无畏')
-    if (personality.patience >= 7) traits.push('耐心持久')
-    if (personality.wisdom >= 7) traits.push('睿智通达')
-    if (personality.compassion >= 7) traits.push('仁慈善良')
-
-    // 道德倾向
-    if (personality.righteousness >= 7) traits.push('正义凛然')
-    if (personality.selflessness >= 7) traits.push('无私奉献')
-    if (personality.greed >= 5) traits.push('欲望强烈')
-    if (personality.ruthlessness >= 5) traits.push('行事冷酷')
-
-    // 修炼风格
-    if (personality.combat_oriented >= 7) traits.push('战斗型')
-    if (personality.cultivation_focused >= 7) traits.push('修炼型')
-    if (personality.knowledge_seeking >= 7) traits.push('求知型')
-
-    return traits.length > 0 ? traits.join('、') : '性格平凡'
   }
 
   /**

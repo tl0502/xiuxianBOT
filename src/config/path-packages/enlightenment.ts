@@ -48,10 +48,10 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '若修炼与救人只能二选一，你会如何抉择？',
         options: [
-          { text: 'A. 修炼为先，唯有强大才能救更多人', value: 'pragmatic' },
-          { text: 'B. 救人为先，道心不可失', value: 'righteous' },
-          { text: 'C. 视情况而定，没有绝对的选择', value: 'flexible' },
-          { text: 'D. 寻求两全之法，不做非此即彼的选择', value: 'creative' }
+          { text: 'A. 修炼为先，唯有强大才能救更多人', value: { determination: 4, focus: 3, greed: 2 } },
+          { text: 'B. 救人为先，道心不可失', value: { kindness: 5, courage: 4, honesty: 2 } },
+          { text: 'C. 视情况而定，没有绝对的选择', value: { stability: 4, focus: 3 } },
+          { text: 'D. 寻求两全之法，不做非此即彼的选择', value: { focus: 5, determination: 3 } }
         ]
       },
       {
@@ -59,10 +59,10 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '面对道心动摇，你会如何应对？',
         options: [
-          { text: 'A. 直面内心，剖析动摇之因', value: 'introspective' },
-          { text: 'B. 坚定信念，不予理会', value: 'steadfast' },
-          { text: 'C. 寻求师长指点', value: 'humble' },
-          { text: 'D. 入世历练，在红尘中磨砺', value: 'experiential' }
+          { text: 'A. 直面内心，剖析动摇之因', value: { honesty: 5, focus: 5 } },
+          { text: 'B. 坚定信念，不予理会', value: { determination: 5, stability: 3 } },
+          { text: 'C. 寻求师长指点', value: { honesty: 4, kindness: 2 } },
+          { text: 'D. 入世历练，在红尘中磨砺', value: { courage: 4, determination: 3 } }
         ]
       },
       {
@@ -146,10 +146,10 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '观落叶飘零，你悟出了什么？',
         options: [
-          { text: 'A. 顺势而为，不强求', value: 'flowing' },
-          { text: 'B. 生死循环，皆是自然', value: 'cyclical' },
-          { text: 'C. 落叶归根，饮水思源', value: 'grateful' },
-          { text: 'D. 只是落叶，何必多想', value: 'direct' }
+          { text: 'A. 顺势而为，不强求', value: { stability: 5, focus: 2 } },
+          { text: 'B. 生死循环，皆是自然', value: { stability: 4, honesty: 3 } },
+          { text: 'C. 落叶归根，饮水思源', value: { kindness: 4, honesty: 3 } },
+          { text: 'D. 只是落叶，何必多想', value: { stability: 3, focus: 1 } }
         ]
       },
       {
@@ -157,10 +157,10 @@ export const enlightenmentPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '观流水不息，你体会到什么？',
         options: [
-          { text: 'A. 柔能克刚，水滴石穿', value: 'persistent' },
-          { text: 'B. 随形就势，灵活变通', value: 'adaptable' },
-          { text: 'C. 百川归海，殊途同归', value: 'unified' },
-          { text: 'D. 逝者如斯，要珍惜时间', value: 'urgent' }
+          { text: 'A. 柔能克刚，水滴石穿', value: { determination: 4, stability: 4 } },
+          { text: 'B. 随形就势，灵活变通', value: { stability: 4, focus: 3 } },
+          { text: 'C. 百川归海，殊途同归', value: { stability: 4, honesty: 2 } },
+          { text: 'D. 逝者如斯，要珍惜时间', value: { focus: 3, impatience: 2 } }
         ]
       },
       {

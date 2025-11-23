@@ -48,10 +48,10 @@ export const bondPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '你的挚友被仇家追杀，来向你求助。但帮助他会得罪一个强大的宗门。你会？',
         options: [
-          { text: 'A. 毫不犹豫地帮助，朋友比什么都重要', value: 'loyal' },
-          { text: 'B. 提供有限帮助，但不直接对抗', value: 'cautious' },
-          { text: 'C. 劝说他自首或逃走，自己不参与', value: 'neutral' },
-          { text: 'D. 拒绝帮助，甚至考虑出卖换取好处', value: 'selfish' }
+          { text: 'A. 毫不犹豫地帮助，朋友比什么都重要', value: { kindness: 5, courage: 5, honesty: 2 } },
+          { text: 'B. 提供有限帮助，但不直接对抗', value: { kindness: 3, stability: 3, manipulation: 2 } },
+          { text: 'C. 劝说他自首或逃走，自己不参与', value: { stability: 4, focus: 2 } },
+          { text: 'D. 拒绝帮助，甚至考虑出卖换取好处', value: { greed: 5, manipulation: 5, kindness: -3 } }
         ]
       },
       {
@@ -59,10 +59,10 @@ export const bondPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '后来你发现，朋友其实是被诬陷的。你会？',
         options: [
-          { text: 'A. 调查真相，为他洗清冤屈', value: 'justice' },
-          { text: 'B. 告诉他真相，由他自己决定', value: 'respectful' },
-          { text: 'C. 保持沉默，事不关己', value: 'indifferent' },
-          { text: 'D. 这改变不了我的决定', value: 'stubborn' }
+          { text: 'A. 调查真相，为他洗清冤屈', value: { honesty: 5, courage: 5, kindness: 3 } },
+          { text: 'B. 告诉他真相，由他自己决定', value: { honesty: 4, kindness: 3 } },
+          { text: 'C. 保持沉默，事不关己', value: { stability: 3, kindness: -2 } },
+          { text: 'D. 这改变不了我的决定', value: { determination: 4, stability: 2 } }
         ]
       },
       {
@@ -146,10 +146,10 @@ export const bondPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '家族遭遇灭门危机，族长传讯让你立刻回去。但你正在闭关突破的关键时刻。你会？',
         options: [
-          { text: 'A. 立即放弃突破，回家救援', value: 'family_first' },
-          { text: 'B. 加速突破，然后回去（可能来不及）', value: 'balance' },
-          { text: 'C. 完成突破再回去，实力更强才能帮上忙', value: 'pragmatic' },
-          { text: 'D. 不回去，避免自己也陷入险境', value: 'self_preservation' }
+          { text: 'A. 立即放弃突破，回家救援', value: { kindness: 5, courage: 5, determination: 2 } },
+          { text: 'B. 加速突破，然后回去（可能来不及）', value: { determination: 4, focus: 3, impatience: 2 } },
+          { text: 'C. 完成突破再回去，实力更强才能帮上忙', value: { focus: 4, determination: 3, greed: 2 } },
+          { text: 'D. 不回去，避免自己也陷入险境', value: { greed: 4, stability: 3, kindness: -3 } }
         ]
       },
       {
@@ -157,10 +157,10 @@ export const bondPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '你赶回时发现，家族危机是因为族长的错误决策引起的。此时你的选择是？',
         options: [
-          { text: 'A. 无论如何都要救家族，这是血脉责任', value: 'unconditional' },
-          { text: 'B. 救人但要求族长认错改过', value: 'conditional' },
-          { text: 'C. 只救无辜族人，不管族长', value: 'selective' },
-          { text: 'D. 这是他自找的，让他自己承担', value: 'detached' }
+          { text: 'A. 无论如何都要救家族，这是血脉责任', value: { kindness: 5, courage: 4, honesty: 2 } },
+          { text: 'B. 救人但要求族长认错改过', value: { honesty: 5, determination: 4, kindness: 2 } },
+          { text: 'C. 只救无辜族人，不管族长', value: { kindness: 4, focus: 3, determination: 2 } },
+          { text: 'D. 这是他自找的，让他自己承担', value: { determination: 3, stability: 2, kindness: -2 } }
         ]
       },
       {

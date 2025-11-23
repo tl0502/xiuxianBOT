@@ -52,10 +52,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '在修仙路上，你最看重什么？',
         options: [
-          { text: 'A. 强大的力量', value: 'power' },
-          { text: 'B. 悠长的寿命', value: 'longevity' },
-          { text: 'C. 至高的境界', value: 'realm' },
-          { text: 'D. 内心的平静', value: 'peace' }
+          { text: 'A. 强大的力量', value: { determination: 4, greed: 3, impatience: 2 } },
+          { text: 'B. 悠长的寿命', value: { stability: 4, focus: 2, greed: 2 } },
+          { text: 'C. 至高的境界', value: { determination: 5, focus: 4, stability: 2 } },
+          { text: 'D. 内心的平静', value: { stability: 5, honesty: 3, kindness: 2 } }
         ]
       },
       {
@@ -63,10 +63,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '当面对生死抉择时，你会？',
         options: [
-          { text: 'A. 舍身取义，保护他人', value: 'sacrifice' },
-          { text: 'B. 随机应变，寻找生机', value: 'adapt' },
-          { text: 'C. 冷静分析，权衡利弊', value: 'rational' },
-          { text: 'D. 遵从本心，无愧于心', value: 'instinct' }
+          { text: 'A. 舍身取义，保护他人', value: { courage: 5, kindness: 5, determination: 2 } },
+          { text: 'B. 随机应变，寻找生机', value: { focus: 4, determination: 3 } },
+          { text: 'C. 冷静分析，权衡利弊', value: { stability: 5, focus: 4 } },
+          { text: 'D. 遵从本心，无愧于心', value: { honesty: 5, stability: 3 } }
         ]
       },
       {
@@ -145,10 +145,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '修仙的意义是什么？',
         options: [
-          { text: 'A. 超脱生死，长生不老', value: 'immortal' },
-          { text: 'B. 探索天地，求知若渴', value: 'knowledge' },
-          { text: 'C. 守护世间，济世为怀', value: 'guardian' },
-          { text: 'D. 证道成仙，飞升上界', value: 'ascension' }
+          { text: 'A. 超脱生死，长生不老', value: { stability: 3, greed: 3, determination: 2 } },
+          { text: 'B. 探索天地，求知若渴', value: { focus: 5, determination: 3, stability: 2 } },
+          { text: 'C. 守护世间，济世为怀', value: { kindness: 5, courage: 3, honesty: 2 } },
+          { text: 'D. 证道成仙，飞升上界', value: { determination: 5, focus: 4 } }
         ]
       },
       {
@@ -156,10 +156,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '若有捷径可走，代价是违背本心，你会？',
         options: [
-          { text: 'A. 坚守本心，绝不妥协', value: 'integrity' },
-          { text: 'B. 视情况而定，灵活变通', value: 'flexible' },
-          { text: 'C. 权衡利弊，理性选择', value: 'pragmatic' },
-          { text: 'D. 相信直觉，跟随内心', value: 'intuitive' }
+          { text: 'A. 坚守本心，绝不妥协', value: { honesty: 5, determination: 4, stability: 2 } },
+          { text: 'B. 视情况而定，灵活变通', value: { focus: 3, manipulation: 2, stability: 1 } },
+          { text: 'C. 权衡利弊，理性选择', value: { focus: 4, stability: 3 } },
+          { text: 'D. 相信直觉，跟随内心', value: { honesty: 4, courage: 2 } }
         ]
       },
       {
@@ -237,10 +237,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '回首修仙路，你最大的遗憾是？',
         options: [
-          { text: 'A. 未能保护重要的人', value: 'regret_protect' },
-          { text: 'B. 错过重要的机缘', value: 'regret_chance' },
-          { text: 'C. 做出了错误的选择', value: 'regret_choice' },
-          { text: 'D. 从无遗憾，坦然前行', value: 'no_regret' }
+          { text: 'A. 未能保护重要的人', value: { kindness: 4, honesty: 3, courage: 1 } },
+          { text: 'B. 错过重要的机缘', value: { greed: 3, impatience: 2, focus: 1 } },
+          { text: 'C. 做出了错误的选择', value: { honesty: 4, focus: 3 } },
+          { text: 'D. 从无遗憾，坦然前行', value: { determination: 4, stability: 3 } }
         ]
       },
       {
@@ -248,10 +248,10 @@ export const trialPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '面对曾经的过错，你会？',
         options: [
-          { text: 'A. 竭力弥补，赎回过失', value: 'redemption' },
-          { text: 'B. 接受现实，放下过去', value: 'acceptance' },
-          { text: 'C. 深刻反思，避免重蹈', value: 'reflection' },
-          { text: 'D. 无愧于心，继续前行', value: 'forward' }
+          { text: 'A. 竭力弥补，赎回过失', value: { determination: 4, kindness: 4, honesty: 2 } },
+          { text: 'B. 接受现实，放下过去', value: { stability: 5, focus: 2 } },
+          { text: 'C. 深刻反思，避免重蹈', value: { focus: 5, honesty: 4 } },
+          { text: 'D. 无愧于心，继续前行', value: { honesty: 4, determination: 3 } }
         ]
       },
       {
