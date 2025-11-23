@@ -13,6 +13,7 @@ export interface QuestioningRecord {
   answer1: string
   answer2: string
   answer3: string
+  answersJson?: string  // v1.3.0 新增：完整答案数组（JSON格式）
   aiResponse: string // JSON string of AIQuestioningResponse
   personality: string
   tendency: string
@@ -99,6 +100,7 @@ export interface AnswerSubmitData {
   isLastQuestion?: boolean
   timeoutSeconds?: number
   timeoutMessage?: string
+  totalQuestions?: number  // v1.3.0 新增：题目总数
   // 试炼完成数据
   personality?: string
   tendency?: string

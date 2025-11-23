@@ -48,10 +48,10 @@ export const opportunityPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '洞府入口有一道禁制，你隐约感觉到危险气息，你会？',
         options: [
-          { text: 'A. 仔细研究禁制，寻找破解之法', value: 'cautious' },
-          { text: 'B. 直接强行闯入，速战速决', value: 'aggressive' },
-          { text: 'C. 先退后观察，等待时机', value: 'patient' },
-          { text: 'D. 设法引诱他人先行试探', value: 'cunning' }
+          { text: 'A. 仔细研究禁制，寻找破解之法', value: { focus: 5, stability: 3 } },
+          { text: 'B. 直接强行闯入，速战速决', value: { courage: 4, impatience: 3, determination: 2 } },
+          { text: 'C. 先退后观察，等待时机', value: { stability: 5, focus: 2 } },
+          { text: 'D. 设法引诱他人先行试探', value: { manipulation: 5, greed: 2 } }
         ]
       },
       {
@@ -59,10 +59,10 @@ export const opportunityPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '洞府中你发现两件宝物：一件光芒璀璨但有怪异气息，一件朴实无华但蕴含纯正灵气。你会？',
         options: [
-          { text: 'A. 只取朴实那件，光芒太盛必有蹊跷', value: 'wise' },
-          { text: 'B. 两件都要，管他什么气息', value: 'greedy' },
-          { text: 'C. 都不取，直觉告诉你这是陷阱', value: 'cautious' },
-          { text: 'D. 先用法诀检验两件宝物', value: 'thorough' }
+          { text: 'A. 只取朴实那件，光芒太盛必有蹊跷', value: { focus: 4, stability: 4, honesty: 2 } },
+          { text: 'B. 两件都要，管他什么气息', value: { greed: 5, impatience: 3 } },
+          { text: 'C. 都不取，直觉告诉你这是陷阱', value: { stability: 5, focus: 2 } },
+          { text: 'D. 先用法诀检验两件宝物', value: { focus: 5, stability: 3 } }
         ]
       },
       {
@@ -144,10 +144,10 @@ export const opportunityPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '商人开出的价格远低于市价，你的第一反应是？',
         options: [
-          { text: 'A. 立即购买，这是难得的机会', value: 'impulsive' },
-          { text: 'B. 仔细检查秘籍真伪', value: 'cautious' },
-          { text: 'C. 询问秘籍来源', value: 'inquisitive' },
-          { text: 'D. 直接离开，便宜没好货', value: 'skeptical' }
+          { text: 'A. 立即购买，这是难得的机会', value: { impatience: 4, greed: 3 } },
+          { text: 'B. 仔细检查秘籍真伪', value: { focus: 5, stability: 3 } },
+          { text: 'C. 询问秘籍来源', value: { focus: 4, honesty: 2 } },
+          { text: 'D. 直接离开，便宜没好货', value: { stability: 4, focus: 2 } }
         ]
       },
       {
@@ -155,10 +155,10 @@ export const opportunityPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '商人见你犹豫，又拿出一件更珍贵的宝物，声称可以搭售。你会？',
         options: [
-          { text: 'A. 更加警惕，这像是在下套', value: 'alert' },
-          { text: 'B. 心动不已，立即成交', value: 'tempted' },
-          { text: 'C. 假装离开，看他反应', value: 'strategic' },
-          { text: 'D. 要求试用后再决定', value: 'practical' }
+          { text: 'A. 更加警惕，这像是在下套', value: { stability: 5, focus: 4 } },
+          { text: 'B. 心动不已，立即成交', value: { greed: 5, impatience: 4 } },
+          { text: 'C. 假装离开，看他反应', value: { manipulation: 4, focus: 3 } },
+          { text: 'D. 要求试用后再决定', value: { focus: 4, stability: 2 } }
         ]
       },
       {

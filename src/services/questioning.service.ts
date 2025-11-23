@@ -259,6 +259,7 @@ export class QuestioningService {
         // 试炼问心：惩罚（例如扣除灵石）并记录
         const penalty = detect.severity === 'high' ? -200 : -100
         try {
+          const allAnswersText = existingAnswersText.concat([answer])  // v1.3.0: 完整答案数组
           await this.context.database.create('xiuxian_questioning_v3', {
             userId,
             pathId: path.id,
@@ -266,6 +267,7 @@ export class QuestioningService {
             answer1: existingAnswersText[0] || '',
             answer2: existingAnswersText[1] || '',
             answer3: answer,
+            answersJson: JSON.stringify(allAnswersText),  // v1.3.0: 完整答案
             aiResponse: JSON.stringify({ personality: '反作弊触发', tendency: '违规', reward: { type: 'spiritStone', value: penalty }, reason: detect.reason }),
             personality: '你的回答被判定为异常，影响天道评估。',
             tendency: '违规',
@@ -285,8 +287,9 @@ export class QuestioningService {
       session.answers.push(answer)
     }
 
-    // 检查是否完成所有问题
-    if (session.currentStep >= 3) {
+    // v1.3.0: 动态检查是否完成所有问题
+    const totalQuestions = path.questions.length
+    if (session.currentStep >= totalQuestions) {
       // 设置完成标志，防止并发重复完成
       session.isCompleting = true
       this.sessions.set(userId, session)
@@ -317,9 +320,10 @@ export class QuestioningService {
         step: session.currentStep,
         question: nextQuestion.question,
         options: nextQuestion.options?.map(o => o.text),
-        isLastQuestion: session.currentStep === 3,
+        isLastQuestion: session.currentStep === totalQuestions,  // v1.3.0: 动态判断
         timeoutSeconds: timeoutForNext,
-        timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`
+        timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`,
+        totalQuestions  // v1.3.0 新增：动态题目数量
       }
     }
   }
@@ -626,6 +630,7 @@ export class QuestioningService {
         answer1: answersText[0] || '',
         answer2: answersText[1] || '',
         answer3: answersText[2] || '',
+        answersJson: JSON.stringify(answersText),  // v1.3.0: 完整答案数组
         aiResponse: JSON.stringify({
           ...aiResponse,
           // ✨ v0.7.0: 保存混合分析详情
@@ -747,6 +752,7 @@ export class QuestioningService {
     options?: string[]
     timeoutSeconds?: number
     timeoutMessage?: string
+    totalQuestions?: number  // v1.3.0 新增
   }>> {
     // 检查是否已有进行中的问心
     if (this.sessions.has(userId)) {
@@ -782,7 +788,8 @@ export class QuestioningService {
         question: firstQuestion.question,
         options: firstQuestion.options?.map(o => o.text),
         timeoutSeconds: session.timeoutSeconds,
-        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`,
+        totalQuestions: pkg.questions.length  // v1.3.0 新增：动态题目数量
       }
     }
   }
@@ -802,6 +809,7 @@ export class QuestioningService {
     options?: string[]
     timeoutSeconds?: number
     timeoutMessage?: string
+    totalQuestions?: number  // v1.3.0 新增
   }>> {
     // 检查是否已有进行中的问心
     if (this.sessions.has(userId)) {
@@ -849,7 +857,8 @@ export class QuestioningService {
         question: firstQuestion.question,
         options: firstQuestion.options?.map(o => o.text),
         timeoutSeconds: session.timeoutSeconds,
-        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`,
+        totalQuestions: pkg.questions.length  // v1.3.0 新增：动态题目数量
       }
     }
   }
@@ -868,6 +877,7 @@ export class QuestioningService {
     options?: string[]
     timeoutSeconds?: number
     timeoutMessage?: string
+    totalQuestions?: number  // v1.3.0 新增
   }>> {
     // 检查是否已有进行中的问心
     if (this.sessions.has(userId)) {
@@ -904,7 +914,8 @@ export class QuestioningService {
         question: firstQuestion.question,
         options: firstQuestion.options?.map(o => o.text),
         timeoutSeconds: session.timeoutSeconds,
-        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`,
+        totalQuestions: pkg.questions.length  // v1.3.0 新增：动态题目数量
       }
     }
   }
@@ -994,6 +1005,7 @@ export class QuestioningService {
         answer1: answersText[0] || '',
         answer2: answersText[1] || '',
         answer3: answersText[2] || '',
+        answersJson: JSON.stringify(answersText),  // v1.3.0: 完整答案数组
         aiResponse: JSON.stringify({
           personalityScore,
           choiceScore: analysisResult.choiceScore,
@@ -1256,15 +1268,18 @@ export class QuestioningService {
     matchResult?: MatchResult,
     aiReasoning?: string
   ): string {
+    // v1.3.0: 动态生成修士回答部分
+    const answersSection = answers
+      .map((a, i) => `第${i + 1}题：${a || '未回答'}`)
+      .join('\n')
+
     let prompt = `你是修仙世界的天道评判者，需要根据修士在"${pkg.name}"中的表现给出评语。
 
 【问道包描述】
 ${pkg.description}
 
 【修士回答】
-第1题：${answers[0] || '未回答'}
-第2题：${answers[1] || '未回答'}
-第3题：${answers[2] || '未回答'}
+${answersSection}
 
 【性格分析】
 ${generateSimilarityAnalysis(personalityScore, pkg.optimalScore?.target || personalityScore)}
@@ -1413,8 +1428,9 @@ ${aiReasoning}
       session.answers.push(answer)
     }
 
-    // 检查是否完成所有问题
-    if (session.currentStep >= 3) {
+    // v1.3.0: 动态检查是否完成所有问题
+    const totalQuestions = pkg.questions.length
+    if (session.currentStep >= totalQuestions) {
       // 设置完成标志，防止并发重复完成
       session.isCompleting = true
       this.sessions.set(userId, session)
@@ -1435,9 +1451,10 @@ ${aiReasoning}
         step: session.currentStep,
         question: nextQuestion.question,
         options: nextQuestion.options?.map(o => o.text),
-        isLastQuestion: session.currentStep === 3,
+        isLastQuestion: session.currentStep === totalQuestions,  // v1.3.0: 动态判断
         timeoutSeconds: timeoutForNext,
-        timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`
+        timeoutMessage: `本题限时 ${timeoutForNext} 秒，请及时回复。`,
+        totalQuestions  // v1.3.0 新增：动态题目数量
       }
     }
   }

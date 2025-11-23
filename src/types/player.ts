@@ -36,6 +36,11 @@ export interface Player {
   // 时间
   createTime: Date              // 创建时间
   lastActiveTime: Date          // 最后活跃时间
+
+  /**
+   * @deprecated v1.2.0 已废弃：改用通用冷却系统（xiuxian_cooldown_v3表）
+   * 保留字段用于向后兼容，不再更新
+   */
   lastQuestioningTime?: Date    // v1.1.0 新增：最后一次完成问道守心的时间
 
   // 封禁状态（v0.9.2 新增）

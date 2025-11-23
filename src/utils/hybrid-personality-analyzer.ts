@@ -193,80 +193,42 @@ export class HybridPersonalityAnalyzer {
 
   /**
    * 应用选择题规则
+   * v1.3.0 重构：从question.options[x].value对象中读取分数
    */
   private applyChoiceRules(
     score: PersonalityScore,
     questionIndex: number,
     answer: string,
-    _question: Question
+    question: Question
   ): void {
-    // 通用规则：根据问题索引和答案字母
-    // 这是简化版本，实际使用时可以根据_question.id定制规则
+    // v1.3.0: 直接从选项的value对象读取分数
+    if (!question.options || question.options.length === 0) {
+      return
+    }
 
-    if (questionIndex === 0) {
-      // 第1题规则（假设是道德选择题）
-      switch (answer) {
-        case 'A':  // 通常是最善良的选项
-          score.kindness += 4
-          score.courage += 2
-          score.honesty += 2
-          break
-        case 'B':  // 中庸选项
-          score.stability += 2
-          score.focus += 1
-          score.greed += 1
-          break
-        case 'C':  // 谨慎选项
-          score.focus += 3
-          score.stability += 3
-          score.determination += 1
-          break
-        case 'D':  // 自私选项
-          score.determination += 3
-          score.greed += 5
-          score.impatience += 2
-          break
-      }
-    } else if (questionIndex === 1) {
-      // 第2题规则（假设是应对方式题）
-      switch (answer) {
-        case 'A':  // 勇猛
-          score.courage += 5
-          score.determination += 2
-          break
-        case 'B':  // 智谋
-          score.focus += 4
-          score.stability += 2
-          break
-        case 'C':  // 隐忍
-          score.stability += 5
-          score.focus += 2
-          break
-        case 'D':  // 灵活
-          score.determination += 3
-          score.focus += 2
-          break
-      }
-    } else {
-      // 第3+题的通用规则
-      switch (answer) {
-        case 'A':
-          score.courage += 2
-          score.determination += 1
-          break
-        case 'B':
-          score.focus += 2
-          score.stability += 1
-          break
-        case 'C':
-          score.stability += 2
-          score.focus += 1
-          break
-        case 'D':
-          score.determination += 2
-          break
+    // 计算选项索引（A=0, B=1, C=2, D=3...）
+    const optionIndex = answer.charCodeAt(0) - 65
+    if (optionIndex < 0 || optionIndex >= question.options.length) {
+      this.ctx.logger('xiuxian').warn(`无效的选项索引: ${answer} (问题${questionIndex + 1})`)
+      return
+    }
+
+    const selectedOption = question.options[optionIndex]
+    if (!selectedOption || !selectedOption.value) {
+      this.ctx.logger('xiuxian').warn(`选项${answer}没有value配置 (问题${questionIndex + 1})`)
+      return
+    }
+
+    // 应用value对象中的分数到总分
+    for (const dimension in selectedOption.value) {
+      const key = dimension as keyof PersonalityScore
+      const value = selectedOption.value[key]
+      if (typeof value === 'number') {
+        score[key] += value
       }
     }
+
+    this.ctx.logger('xiuxian').debug(`问题${questionIndex + 1}选项${answer}: ${JSON.stringify(selectedOption.value)}`)
   }
 
   /**

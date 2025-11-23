@@ -408,9 +408,7 @@ export function registerDevPackageCommands(
             message += `   最低要求：${getRealmName(path.triggerConditions.minRealm, 0)}\n`
           }
 
-          if (path.triggerConditions.cooldownHours) {
-            message += `   冷却时间：${path.triggerConditions.cooldownHours}小时\n`
-          }
+          // v1.2.0: 冷却时间已改用通用冷却系统，不再从包配置读取
 
           message += '\n'
         }

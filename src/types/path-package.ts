@@ -7,10 +7,11 @@ import { SpiritualRootType } from '../config/spiritual-roots'
 
 /**
  * 问题选项
+ * v1.3.0 更新：value改为9维打分对象
  */
 export interface QuestionOption {
   text: string
-  value: string
+  value: Partial<PersonalityScore>  // v1.3.0: 9维打分对象，例如 { kindness: 4, courage: 2 }
 }
 
 /**

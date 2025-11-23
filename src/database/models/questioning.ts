@@ -23,10 +23,13 @@ export function initQuestioningModel(ctx: Context) {
     pathId: 'string',
     pathName: 'string',
 
-    // 三次回答
+    // 三次回答（向后兼容）
     answer1: 'string',
     answer2: 'string',
     answer3: 'text', // 文本题可能较长
+
+    // v1.3.0 新增：完整答案数组（JSON格式）
+    answersJson: 'text',
 
     // AI 完整响应（JSON）
     aiResponse: 'text',

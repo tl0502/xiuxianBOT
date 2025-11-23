@@ -78,7 +78,7 @@ export function registerQuestioningCommands(
 
         let message = `\n\n━━━━ ${result.data.packageName} ━━━━\n\n`
         message += `${result.data.description}\n\n`
-        message += `📝 问题 1/3：\n${result.data.question}\n\n`
+        message += `📝 问题 1/${result.data.totalQuestions || 3}：\n${result.data.question}\n\n`
 
         if (result.data.options) {
           result.data.options.forEach((opt: string) => {
@@ -209,7 +209,7 @@ export function registerQuestioningCommands(
       // 如果还有下一题（检查是否有 step 字段）
       if (result.data && 'step' in result.data) {
         const data = result.data as AnswerSubmitData
-        let message = `\n\n📝 问题 ${data.step}/3：\n`
+        let message = `\n\n📝 问题 ${data.step}/${data.totalQuestions || 3}：\n`
         message += `${data.question}\n\n`
 
         if (data.options) {

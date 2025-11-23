@@ -5,7 +5,6 @@ import { KoishiAppContext } from './adapters/koishi'
 import { RootStatsService } from './services/root-stats.service'
 import { PlayerService } from './services/player.service'
 import * as chatluna from './chatluna'
-import { PersonalitySystemVersion, setPersonalitySystemConfig } from './config/personality-system-config'
 
 export const name = 'xiuxian-txl'
 export const inject = {
@@ -15,9 +14,6 @@ export const inject = {
 
 export interface Config {
   chatluna?: chatluna.Config
-  personalitySystemVersion?: 'v1.0' | 'v2.0'
-  enableMultiplePaths?: boolean
-  fallbackToV1?: boolean
   // 问道包AI打分（三态：'auto'使用包内配置, 'on'强制开启, 'off'强制关闭）
   enableAIScoring?: 'auto' | 'on' | 'off'
   enableAIScoringFallback?: boolean
@@ -82,22 +78,6 @@ export const Config: Schema<Config> = Schema.intersect([
       .description('✅ 推荐开启 | AI评语失败时自动降级到模板评语，提升用户体验')
   }).description('🎯 问道包 AI 配置（v0.8.2 | 独立控制打分和评语）'),
 
-  // ========== 性格量化系统（高级功能，暂时搁置）==========
-  Schema.object({
-    personalitySystemVersion: Schema.union([
-      Schema.const('v1.0' as const).description('v1.0 - 9维性格 + 规则评分（当前使用）'),
-      Schema.const('v2.0' as const).description('v2.0 - 22维性格 + 全AI解析（实验性，未启用）')
-    ]).default('v1.0' as PersonalitySystemVersion).description('性格系统版本（⚠️ v2.0 暂未集成，请保持 v1.0）'),
-
-    enableMultiplePaths: Schema.boolean()
-      .default(true)
-      .description('多问道包系统（v2.0 专用，当前无效）'),
-
-    fallbackToV1: Schema.boolean()
-      .default(true)
-      .description('v2.0 失败时降级到 v1.0（v2.0 专用，当前无效）')
-  }).description('⚙️ 性格量化系统（高级 | 保持默认即可）'),
-
   // ========== 开发者工具 ==========
   Schema.object({
     enableDevTools: Schema.boolean()
@@ -109,23 +89,6 @@ export const Config: Schema<Config> = Schema.intersect([
 export function apply(ctx: Context, config: Config) {
   // 初始化数据库
   initDatabase(ctx)
-
-  // 配置性格量化系统版本
-  setPersonalitySystemConfig({
-    version: (config.personalitySystemVersion || 'v1.0') as PersonalitySystemVersion,
-    v2Config: {
-      enableMultiplePaths: config.enableMultiplePaths !== false,
-      fallbackToV1: config.fallbackToV1 !== false
-    }
-  })
-
-  // 记录当前使用的版本
-  const version = config.personalitySystemVersion || 'v1.0'
-  ctx.logger('xiuxian').info(`性格量化系统版本: ${version}`)
-  if (version === 'v2.0') {
-    ctx.logger('xiuxian').info(`  - 多问道包: ${config.enableMultiplePaths !== false ? '启用' : '禁用'}`)
-    ctx.logger('xiuxian').info(`  - AI失败降级: ${config.fallbackToV1 !== false ? '启用' : '禁用'}`)
-  }
 
   // 初始化灵根统计表（公平性系统）和Buff清理任务（v1.0.0）
   let playerService: PlayerService | null = null
