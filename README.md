@@ -4,10 +4,26 @@
 
 ## 功能特性
 
-### 当前实现（v1.1.0 + v1.0.1 + v1.0.0 + v0.6.0）
+### 当前实现（v1.2.0 + v1.1.0 + v1.0.1 + v1.0.0 + v0.6.0）
+
+**通用冷却系统与流程优化（v1.2.0新增）**
+- ✨ **通用冷却系统**：新建 `xiuxian_cooldown_v3` 表，支持多种冷却类型（命令、技能、物品、事件）
+- ✨ **命令级包配置**：支持 `allowedTags` 白名单 + `excludeTags` 黑名单双重筛选
+- ✨ **亲和度系统扩展**：
+  - Tag级亲和度：提升整类包（如所有demon包+20%）
+  - 包ID级亲和度：提升特定包（如inner_demon额外+30%）
+  - 两种亲和度可叠加：最终概率 = 基础概率 + tag级加成 + 包ID级加成
+- ✨ **流程优化**：
+  - 新增 `createQuestioningSession` 方法，避免重复查询
+  - 问道守心流程：冷却检查 → 选包 → 直接创建会话
+  - 删除冗余的 `ensureGlobalCooldown` 方法
+- ✨ **代码清理**：
+  - 删除废弃的 `CooldownCheckData` 类型
+  - 删除废弃的 `getGlobalCooldownHours` 方法
+  - 不再使用玩家表的 `lastQuestioningTime` 字段（保留向后兼容）
 
 **问道守心系统重构（v1.1.0新增）**
-- ✨ **全局冷却机制**：移除单包冷却，改为全局冷却（默认72小时），所有问道包共享冷却时间
+- ✨ **全局冷却机制**：移除单包冷却，改为全局冷却（默认8小时），所有问道包共享冷却时间
 - ✨ **灵根亲和度系统**：基于玩家灵根提升特定问道包触发概率，概率归一化确保总和100%
 - ✨ **增强权限检查**：
   - 大境界精准匹配：`exactRealm: 3` 精确要求特定境界
@@ -188,8 +204,19 @@ plugins:
 - `enableDevTools`: 开发者工具开关，启用后可使用测试命令和buff管理命令
 
 **v1.1.0 新增配置常量**（位于 `src/config/constants.ts`）：
-- `GLOBAL_COOLDOWN_HOURS`: 全局冷却时间（小时），默认72小时
+- `GLOBAL_COOLDOWN_HOURS`: 全局冷却时间（小时），默认8小时
 - `ENABLE_AFFINITY_BONUS`: 是否启用灵根亲和度加成，默认true
+
+### 问道包触发条件字段指引
+
+- `minRealm` / `maxRealm`: 控制玩家大境界范围，日志以 `[触发条件检查]` 开头记录实际判定值，`false` 可跳过检查。
+- `exactRealm`: 精准匹配大境界，可与小境界字段组合；命中时日志会输出 `exactRealm` 判定信息。
+- `minRealmLevel` / `maxRealmLevel`: 限制小境界（初期/中期/后期/大圆满 对应 0-3），仅当玩家境界满足大境界要求时生效。
+- `requiredSpiritualRoots`: 灵根白名单，支持单个或数组；`forbiddenSpiritualRoots` 用于黑名单，触发时日志会提示被拒绝的灵根。
+- `minSpiritStone`: 要求最低灵石数量；`minKillCount`: 要求最低战绩击杀数。未满足会在日志中输出不足原因。
+- `requiredItems` / `requiredQuests`: 预留字段，目前服务端只记录 `TODO` 日志提示，未实际校验，请勿依赖。
+
+> 建议在新增问道包时对照上述字段填写，并观察启动日志中的 `[触发条件检查]` 记录，确保配置与预期一致。
 
 注：开发阶段不再使用 `npm link` 方式，以免引发跨盘/路径解析问题。
 
@@ -462,6 +489,67 @@ koishi-plugin-xiuxian-txl/
 - 依赖注入模式，职责清晰
 
 ## 最近变更
+
+### 2025-11-23 - v1.2.0 通用冷却系统与流程优化
+
+**通用冷却系统**
+- ✅ **新建冷却表**：`xiuxian_cooldown_v3` 支持多种冷却类型
+  - 冷却类型：command（命令）、skill（技能）、item（物品）、event（事件）、package（问道包）
+  - 组合唯一索引：(userId, cooldownType, cooldownKey)
+  - 过期时间索引：用于批量清理过期记录
+- ✅ **CooldownService 服务**：
+  - `checkCooldown()` - 检查冷却状态
+  - `setCooldown()` - 设置冷却
+  - `clearCooldown()` - 清除冷却
+  - `cleanupExpired()` - 批量清理过期记录
+- ✅ **命令冷却配置**：`src/config/command-cooldowns.ts`
+  - 问道守心：8小时冷却
+  - 支持未来扩展更多命令
+
+**命令级包配置**
+- ✅ **CommandPackageConfig 接口**：支持白名单+黑名单
+  - `allowedTags`: 允许的tag白名单
+  - `excludeTags`: 排除的tag黑名单
+- ✅ **问道守心配置**：`{ excludeTags: ['initiation'] }`
+
+**亲和度系统扩展**
+- ✅ **PackageAffinity 接口扩展**：
+  - `tag`: Tag级亲和度，提升整类包
+  - `packageId`: 包ID级亲和度，提升特定包
+  - `bonusChance`: 额外触发概率，可叠加
+- ✅ **计算公式**：最终概率 = 基础概率 + tag级加成 + 包ID级加成
+
+**流程优化**
+- ✅ **新增 createQuestioningSession**：直接用已选好的包创建会话，避免重复查询
+- ✅ **问道守心命令重构**：
+  1. 检查冷却（checkCommandCooldown）
+  2. 选包（selectPackageWithAffinity）
+  3. 创建会话（createQuestioningSession）
+- ✅ **设置冷却时机**：问道完成时（completePackageQuestioning）设置冷却
+
+**代码清理**
+- ✅ 删除 `ensureGlobalCooldown` 方法（已废弃）
+- ✅ 删除 `getGlobalCooldownHours` 方法（已废弃）
+- ✅ 删除 `CooldownCheckData` 类型（已废弃）
+- ✅ 更新 `startRandomTrialQuestioning` 使用新冷却系统
+- ✅ 更新 `startPackageByTag` 使用新冷却系统
+
+**新增文件**：
+- `src/types/cooldown.ts` - 冷却类型定义
+- `src/database/models/cooldown.ts` - 冷却表模型
+- `src/services/cooldown.service.ts` - 冷却服务
+- `src/config/command-cooldowns.ts` - 命令冷却配置
+
+**修改文件**：
+- `src/config/spiritual-root-registry.ts` - PackageAffinity 接口扩展
+- `src/types/path-package.ts` - 新增 CommandPackageConfig
+- `src/database/index.ts` - 注册冷却表
+- `src/services/path-package.service.ts` - 重构 selectPackageWithAffinity
+- `src/services/questioning.service.ts` - 集成冷却服务、新增 createQuestioningSession
+- `src/commands/questioning.ts` - 问道守心命令重构
+- `src/types/questioning.ts` - 删除 CooldownCheckData
+
+---
 
 ### 2025-01-22 - v1.1.0 问道守心系统修复与优化
 
@@ -802,6 +890,22 @@ koishi-plugin-xiuxian-txl/
 | stackable | boolean | 是否可堆叠 |
 | maxStacks | unsigned | 最大堆叠数 |
 | description | string | Buff描述 |
+
+**xiuxian_cooldown_v3** - 冷却数据表（v1.2.0新增）
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | unsigned | 主键（自增） |
+| userId | string | 用户ID |
+| cooldownType | string | 冷却类型（command/skill/item/event/package） |
+| cooldownKey | string | 冷却标识（命令名/技能ID/物品ID等） |
+| lastTriggerTime | timestamp | 最后触发时间 |
+| expiresAt | timestamp | 过期时间 |
+| metadata | text | 额外元数据（JSON格式） |
+
+索引：
+- 组合唯一索引：(userId, cooldownType, cooldownKey)
+- 过期时间索引：expiresAt（用于批量清理）
 
 ## 开发工作流
 

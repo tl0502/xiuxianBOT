@@ -124,11 +124,3 @@ export interface InitiationCompleteData {
   personality: string
   reason: string
 }
-
-/**
- * 冷却检查结果
- */
-export interface CooldownCheckData {
-  canStart: boolean
-  remainingHours?: number
-}

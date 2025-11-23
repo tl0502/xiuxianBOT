@@ -7,7 +7,6 @@ import {
   InitiationStartData,
   AnswerSubmitData,
   InitiationCompleteData,
-  CooldownCheckData,
   QuestioningRecord
 } from '../types/questioning'
 import { Player } from '../types/player'
@@ -23,6 +22,8 @@ import { PathPackageConfig } from '../config/constants'
 import { HybridPersonalityAnalyzer } from '../utils/hybrid-personality-analyzer'
 import { AIConfig } from '../config/constants'
 import { BuffType, BuffSource } from '../types/buff'  // v1.0.0 新增：Buff系统
+import { CooldownService } from './cooldown.service'  // v1.2.0 新增：冷却服务
+import { getCommandCooldown } from '../config/command-cooldowns'  // v1.2.0 新增：命令冷却配置
 
 /**
  * 问心服务类
@@ -40,6 +41,7 @@ export class QuestioningService {
   private pathPackageService: PathPackageService
   private hybridAnalyzer: HybridPersonalityAnalyzer
   private cleanupInterval: NodeJS.Timeout
+  private cooldownService: CooldownService  // v1.2.0 新增：冷却服务
 
   constructor(private ctx: Context, pluginConfig?: any) {
     // 创建 Adapter 上下文（传入插件配置）
@@ -50,6 +52,7 @@ export class QuestioningService {
     this.rootStatsService = new RootStatsService(this.context)
     this.pathPackageService = new PathPackageService(this.context)
     this.hybridAnalyzer = new HybridPersonalityAnalyzer(ctx)
+    this.cooldownService = new CooldownService(ctx)  // v1.2.0 新增
 
     // 注册所有问道包
     this.pathPackageService.registerAll(ALL_PATH_PACKAGES)
@@ -109,6 +112,57 @@ export class QuestioningService {
   }
 
   /**
+   * 检查命令冷却（v1.2.0 新增：使用通用冷却服务）
+   * @param userId 用户ID
+   * @param commandName 命令名称
+   * @returns 冷却检查结果
+   */
+  async checkCommandCooldown(
+    userId: string,
+    commandName: string
+  ): Promise<{ canUse: boolean; remainingHours?: number; message?: string }> {
+    const cooldownHours = getCommandCooldown(commandName)
+    if (cooldownHours === 0) {
+      return { canUse: true }
+    }
+
+    const result = await this.cooldownService.checkCooldown(
+      userId,
+      'command',
+      commandName
+    )
+
+    if (!result.canUse) {
+      return {
+        canUse: false,
+        remainingHours: result.remainingHours,
+        message: `冷却中，还需 ${result.remainingHours} 小时`
+      }
+    }
+
+    return { canUse: true }
+  }
+
+  /**
+   * 设置命令冷却（v1.2.0 新增）
+   * @param userId 用户ID
+   * @param commandName 命令名称
+   */
+  async setCommandCooldown(userId: string, commandName: string): Promise<void> {
+    const cooldownHours = getCommandCooldown(commandName)
+    if (cooldownHours === 0) return
+
+    await this.cooldownService.setCooldown(
+      userId,
+      'command',
+      commandName,
+      cooldownHours,
+      { commandName }
+    )
+    this.context.logger.info(`[冷却设置] ${userId} 命令"${commandName}" 冷却 ${cooldownHours} 小时`)
+  }
+
+  /**
    * 获取所有可用的试炼问道包
    */
   getAvailablePaths(player: Player): PathPackageTemplate[] {
@@ -129,45 +183,6 @@ export class QuestioningService {
    */
   getPathById(pathId: string): PathPackageTemplate | null {
     return this.pathPackageService.getById(pathId)
-  }
-
-  /**
-   * 检查冷却时间
-   */
-  async checkCooldown(userId: string, pathId: string): Promise<ServiceResult<CooldownCheckData>> {
-    const path = this.getPathById(pathId)
-    if (!path || !path.triggerConditions.cooldownHours) {
-      return { success: true, message: '无冷却限制', data: { canStart: true } }
-    }
-
-    // 查询最近一次该路径的问心记录
-    const records = await this.context.database.get<any>('xiuxian_questioning_v3', {
-      userId,
-      pathId
-    } as any, {
-      sort: { createTime: 'desc' },
-      limit: 1
-    })
-
-    if (records.length === 0) {
-      return { success: true, message: '首次问心', data: { canStart: true } }
-    }
-
-    const lastTime = new Date(records[0].createTime).getTime()
-    const now = Date.now()
-    const cooldownMs = path.triggerConditions.cooldownHours * 60 * 60 * 1000
-    const elapsed = now - lastTime
-
-    if (elapsed < cooldownMs) {
-      const remainingHours = Math.ceil((cooldownMs - elapsed) / (60 * 60 * 1000))
-      return {
-        success: false,
-        message: `冷却中，还需 ${remainingHours} 小时`,
-        data: { canStart: false, remainingHours }
-      }
-    }
-
-    return { success: true, message: '冷却完成', data: { canStart: true } }
   }
 
   /**
@@ -503,10 +518,10 @@ export class QuestioningService {
     // 随机选择一个
     const path = availablePackages[Math.floor(Math.random() * availablePackages.length)]
 
-    // 检查冷却
-    const cooldownResult = await this.checkCooldown(userId, path.id)
-    if (!cooldownResult.success) {
-      return cooldownResult as any
+    // v1.2.0 更新：使用通用冷却系统
+    const cooldownCheck = await this.checkCommandCooldown(userId, '问道守心')
+    if (!cooldownCheck.canUse) {
+      return { success: false, message: cooldownCheck.message! }
     }
 
     // 创建会话（会话级超时来自 src/config/timeout.json 或使用默认 60s）
@@ -716,6 +731,63 @@ export class QuestioningService {
   // ==================== Tag系统新方法 ====================
 
   /**
+   * 从已选好的问道包创建会话（v1.2.0 新增）
+   *
+   * 用于优化流程：命令层选包 → 直接创建会话
+   * 避免 startPackageByTag 中的重复查询
+   */
+  async createQuestioningSession(
+    userId: string,
+    pkg: PathPackageTemplate
+  ): Promise<ServiceResult<{
+    packageId: string
+    packageName: string
+    description: string
+    question: string
+    options?: string[]
+    timeoutSeconds?: number
+    timeoutMessage?: string
+  }>> {
+    // 检查是否已有进行中的问心
+    if (this.sessions.has(userId)) {
+      return { success: false, message: '你正在进行问心，请先完成或取消' }
+    }
+
+    // 创建会话
+    const session: QuestioningSession = {
+      userId,
+      pathId: pkg.id,
+      currentStep: 1,
+      answers: [],
+      startTime: new Date(),
+      lastQuestionTime: new Date(),
+      timeoutSeconds: this.getDefaultTimeoutSeconds()
+    }
+    this.sessions.set(userId, session)
+
+    // 记录触发次数
+    this.pathPackageService.incrementTriggerCount(pkg.id).catch(err => {
+      this.context.logger.error('更新触发次数失败:', err)
+    })
+
+    // 返回第一题
+    const firstQuestion = pkg.questions[0]
+    return {
+      success: true,
+      message: '问道开始',
+      data: {
+        packageId: pkg.id,
+        packageName: pkg.name,
+        description: pkg.description,
+        question: firstQuestion.question,
+        options: firstQuestion.options?.map(o => o.text),
+        timeoutSeconds: session.timeoutSeconds,
+        timeoutMessage: `本题限时 ${session.timeoutSeconds} 秒，请及时回复。`
+      }
+    }
+  }
+
+  /**
    * 通过Tag启动问道包
    */
   async startPackageByTag(
@@ -736,22 +808,10 @@ export class QuestioningService {
       return { success: false, message: '你正在进行问心，请先完成或取消' }
     }
 
-    // 检查问道守心冷却（v1.1.0：简化为直接检查玩家lastQuestioningTime字段）
-    const cooldownHours = 8  // 固定8小时冷却
-    if (player.lastQuestioningTime) {
-      const lastTime = new Date(player.lastQuestioningTime).getTime()
-      const now = Date.now()
-      const elapsed = now - lastTime
-      const cooldownMs = cooldownHours * 60 * 60 * 1000
-
-      if (elapsed < cooldownMs) {
-        const remainingHours = Math.ceil((cooldownMs - elapsed) / (60 * 60 * 1000))
-        this.context.logger.info(`[问道守心冷却] 用户${userId}冷却中，还需${remainingHours}小时`)
-        return {
-          success: false,
-          message: `冷却中，还需 ${remainingHours} 小时`
-        }
-      }
+    // v1.2.0 更新：使用通用冷却系统
+    const cooldownCheck = await this.checkCommandCooldown(userId, '问道守心')
+    if (!cooldownCheck.canUse) {
+      return { success: false, message: cooldownCheck.message! }
     }
 
     // 随机获取该tag下的问道包
@@ -955,11 +1015,8 @@ export class QuestioningService {
         this.context.logger.error('更新完成次数失败:', err)
       })
 
-      // v1.1.0 新增：更新玩家的问道守心完成时间
-      await this.context.database.set<any>('xiuxian_player_v3', { userId } as any, {
-        lastQuestioningTime: new Date()
-      } as any)
-      this.context.logger.info(`[问道守心] 更新用户${userId}完成时间`)
+      // v1.2.0 更新：使用通用冷却服务替代 lastQuestioningTime
+      await this.setCommandCooldown(userId, '问道守心')
 
       // 清除会话
       this.sessions.delete(userId)

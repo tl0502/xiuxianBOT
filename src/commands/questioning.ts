@@ -18,7 +18,7 @@ export function registerQuestioningCommands(
 
   /**
    * 问道守心（随机选择问道包）
-   * v1.1.0 重构：使用全局冷却和灵根亲和度抽取系统
+   * v1.2.0 重构：使用通用冷却系统 + 命令级包配置 + 灵根亲和度抽取
    * 触发范围：所有问道包（排除 initiation）
    */
   ctx.command('修仙/问道守心', '进行问道试炼（随机路径）')
@@ -36,11 +36,19 @@ export function registerQuestioningCommands(
           ])
         }
 
-        // v1.1.0 新增：使用灵根亲和度抽取问道包
+        // v1.2.0 新增：检查命令冷却
+        const cooldownCheck = await questioningService.checkCommandCooldown(session.userId, '问道守心')
+        if (!cooldownCheck.canUse) {
+          return h('', [
+            atMessage(session.userId, ` ${cooldownCheck.message}`)
+          ])
+        }
+
+        // v1.2.0 更新：使用命令配置 + 灵根亲和度抽取问道包
         const pathPackageService = questioningService.getPathPackageService()
         const selectedPackage = await pathPackageService.selectPackageWithAffinity(
           player,
-          ['initiation']  // 排除步入仙途包
+          { excludeTags: ['initiation'] }  // 排除步入仙途包
         )
 
         if (!selectedPackage) {
@@ -56,11 +64,10 @@ export function registerQuestioningCommands(
           ])
         }
 
-        // 使用包的第一个tag启动（内部会检查冷却时间）
-        const result = await questioningService.startPackageByTag(
+        // v1.2.0 更新：直接使用已选好的包创建会话
+        const result = await questioningService.createQuestioningSession(
           session.userId,
-          selectedPackage.tags[0],
-          player  // 传入玩家对象用于境界检查和冷却检查
+          selectedPackage
         )
 
         if (!result.success || !result.data) {

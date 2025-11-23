@@ -40,11 +40,12 @@ export interface RootBonuses {
 }
 
 /**
- * 隐藏包亲和配置
+ * 包亲和度配置（v1.2.0 升级：支持tag级和包ID级）
  */
 export interface PackageAffinity {
-  packageId: string     // 问道包ID
-  bonusChance: number   // 额外触发概率（如 0.3 = +30%）
+  tag?: string            // tag级亲和度：提升整类包（如 'demon'）
+  packageId?: string      // 包ID级亲和度：提升特定包（如 'inner_demon'）
+  bonusChance: number     // 额外触发概率（如 0.3 = +30%），可叠加
 }
 
 /**

@@ -39,6 +39,15 @@ export type PathPackageTag =
   | string           // 支持自定义tag
 
 /**
+ * 命令级包配置（v1.2.0 新增）
+ * 定义命令可以触发哪些tag的包
+ */
+export interface CommandPackageConfig {
+  allowedTags?: PathPackageTag[]   // 允许的tag白名单
+  excludeTags?: PathPackageTag[]   // 排除的tag黑名单
+}
+
+/**
  * 奖励类型
  */
 export type RewardType = 'spirit_stone' | 'cultivation' | 'item' | 'special'
@@ -138,11 +147,13 @@ export interface TriggerConditions {
 
   /**
    * 需要的道具
+    * TODO: 触发检查逻辑尚未实现，仅作为占位字段
    */
   requiredItems?: string[]
 
   /**
    * 需要完成的前置任务
+    * TODO: 触发检查逻辑尚未实现，仅作为占位字段
    */
   requiredQuests?: string[]
 
