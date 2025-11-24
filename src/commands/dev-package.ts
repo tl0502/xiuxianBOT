@@ -84,9 +84,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -131,9 +131,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -178,9 +178,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -225,9 +225,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -272,9 +272,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -319,9 +319,9 @@ export function registerDevPackageCommands(
           result.data.options.forEach((opt: string, i: number) => {
             message += `${String.fromCharCode(65 + i)}. ${opt}\n`
           })
-          message += `\n请回复选项字母（如：A）`
+          message += `\n请回复：答/A`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {

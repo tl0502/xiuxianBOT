@@ -266,10 +266,10 @@ export const PersonalityConfig = {
 export const AIConfig = {
   // ========== 评分参数 ==========
   /** 每个维度的最大评分 */
-  MAX_SCORE_PER_DIMENSION: 8,
+  MAX_SCORE_PER_DIMENSION: 7,
 
   /** 每个维度的最小评分 */
-  MIN_SCORE_PER_DIMENSION: -3,
+  MIN_SCORE_PER_DIMENSION: -6,
 
   /** 选择题权重 */
   CHOICE_QUESTION_WEIGHT: 0.3,

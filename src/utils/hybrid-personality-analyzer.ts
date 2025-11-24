@@ -21,6 +21,12 @@ export interface HybridAnalysisResult {
   aiReasoning?: string                 // AI评分理由（合并）
   usedAI: boolean                      // 是否使用了AI
   openQuestionIndices?: number[]       // 哪些题是开放题
+  // v1.3.1 新增：降级时反作弊检测结果
+  exploitDetected?: {
+    isExploit: boolean
+    reason: string
+    severity: 'low' | 'high'
+  }
 }
 
 /**
@@ -75,6 +81,22 @@ export class HybridPersonalityAnalyzer {
         this.ctx.logger('xiuxian').error('AI评分已禁用，且未启用规则评分降级')
         throw new Error('AI评分已禁用，且未启用降级模式。请联系管理员启用AI评分或开启降级模式。')
       }
+      // v1.3.1：降级时进行反作弊检测
+      for (const index of openQuestionIndices) {
+        const answer = answers[index]
+        if (answer && answer.trim().length > 0) {
+          const detect = this.detectExploitation(answer)
+          if (detect.isExploit) {
+            this.ctx.logger('xiuxian').warn(`[降级反作弊] 检测到作弊: ${detect.reason}`)
+            return {
+              finalScore: choiceScore,
+              choiceScore: choiceScore,
+              usedAI: false,
+              exploitDetected: detect
+            }
+          }
+        }
+      }
       // 允许降级，使用选择题分数
       return {
         finalScore: choiceScore,
@@ -123,6 +145,23 @@ export class HybridPersonalityAnalyzer {
 
       if (!options?.enableFallback) {
         throw error  // 不允许降级，抛出错误
+      }
+
+      // v1.3.1：降级时进行反作弊检测
+      for (const index of openQuestionIndices) {
+        const answer = answers[index]
+        if (answer && answer.trim().length > 0) {
+          const detect = this.detectExploitation(answer)
+          if (detect.isExploit) {
+            this.ctx.logger('xiuxian').warn(`[降级反作弊] 检测到作弊: ${detect.reason}`)
+            return {
+              finalScore: choiceScore,
+              choiceScore: choiceScore,
+              usedAI: false,
+              exploitDetected: detect
+            }
+          }
+        }
       }
 
       // 允许降级，只使用选择题分数
@@ -390,19 +429,22 @@ export class HybridPersonalityAnalyzer {
 
   /**
    * ✨ v0.7.0 新增：INITIATION 专用分析
+   * ✨ v1.3.1 更新：使用配置化评分方法
    *
    * 与问道包AI评分的关键区别：
-   * 1. 选择题使用 personality-analyzer.ts 的精确规则（而非混合分析器的简化规则）
+   * 1. 选择题使用配置化的value对象评分（v1.3.1起）
    * 2. 开放题使用客观、无偏向的AI评分
    * 3. 总是允许降级（不能阻止创角流程）
    *
    * @param answers 用户的3个回答 [A, B, "开放文本"]
+   * @param questions 问道包的问题配置（用于读取value对象）
    * @param enableAI 是否启用AI评分开放题
    * @param enableFallback AI失败时是否降级（建议true）
    * @returns 混合分析结果
    */
   async analyzeInitiation(
     answers: string[],
+    questions: Question[],
     enableAI: boolean = true,
     enableFallback: boolean = true
   ): Promise<HybridAnalysisResult> {
@@ -419,6 +461,20 @@ export class HybridPersonalityAnalyzer {
         if (!enableFallback) {
           this.ctx.logger('xiuxian').error('AI评分已禁用，且未启用关键词评分降级')
           throw new Error('AI评分已禁用，且未启用降级模式。请联系管理员启用AI评分或开启降级模式。')
+        }
+        // v1.3.1：降级时进行反作弊检测
+        const openQuestionAnswer = answers[2]
+        if (openQuestionAnswer && openQuestionAnswer.trim().length > 0) {
+          const detect = this.detectExploitation(openQuestionAnswer)
+          if (detect.isExploit) {
+            this.ctx.logger('xiuxian').warn(`[INITIATION降级反作弊] 检测到作弊: ${detect.reason}`)
+            return {
+              finalScore: baselineScore,
+              choiceScore: baselineScore,
+              usedAI: false,
+              exploitDetected: detect
+            }
+          }
         }
         this.ctx.logger('xiuxian').info('AI评分未启用，使用关键词评分')
         return {
@@ -451,9 +507,9 @@ export class HybridPersonalityAnalyzer {
         }
       )
 
-      // 5. 重新计算最终分数：选择题（第1-2题规则评分）+ AI开放题评分
+      // 5. 重新计算最终分数：选择题（第1-2题配置化评分）+ AI开放题评分
       // 注意：baselineScore 包含了关键词评分的第3题，需要分离
-      const choiceOnlyScore = this.extractChoiceScore(answers)
+      const choiceOnlyScore = this.extractChoiceScore(answers, questions)
 
       // ⚠️ INITIATION 使用简单加法保持向后兼容（灵根分配公平性依赖）
       // 不使用加权平均，因为会改变分数分布，影响灵根概率
@@ -482,6 +538,22 @@ export class HybridPersonalityAnalyzer {
         throw error
       }
 
+      // v1.3.1：降级时进行反作弊检测
+      const openAnswer = answers[2]
+      if (openAnswer && openAnswer.trim().length > 0) {
+        const detect = this.detectExploitation(openAnswer)
+        if (detect.isExploit) {
+          this.ctx.logger('xiuxian').warn(`[INITIATION降级反作弊] 检测到作弊: ${detect.reason}`)
+          const fallbackScore = analyzePersonality(answers)
+          return {
+            finalScore: fallbackScore,
+            choiceScore: fallbackScore,
+            usedAI: false,
+            exploitDetected: detect
+          }
+        }
+      }
+
       // 降级到关键词评分
       this.ctx.logger('xiuxian').warn('降级使用关键词评分')
       const fallbackScore = analyzePersonality(answers)
@@ -496,11 +568,84 @@ export class HybridPersonalityAnalyzer {
 
   /**
    * 提取选择题分数（仅第1-2题，不含第3题开放题）
+   * v1.3.1 重构：使用配置化评分方法而非硬编码规则
    */
-  private extractChoiceScore(answers: string[]): PersonalityScore {
-    // 复用 personality-analyzer.ts 的逻辑，但只传入前2题
-    const choiceAnswers = [answers[0], answers[1], '']  // 第3题留空
-    return analyzePersonality(choiceAnswers)
+  private extractChoiceScore(answers: string[], questions: Question[]): PersonalityScore {
+    const score: PersonalityScore = {
+      determination: 0,
+      courage: 0,
+      stability: 0,
+      focus: 0,
+      honesty: 0,
+      kindness: 0,
+      greed: 0,
+      impatience: 0,
+      manipulation: 0
+    }
+
+    // 只处理前2题（选择题）
+    for (let i = 0; i < 2 && i < questions.length && i < answers.length; i++) {
+      const question = questions[i]
+
+      // 跳过非选择题
+      if (question.type !== 'choice' || !question.options) {
+        continue
+      }
+
+      const answer = answers[i]?.trim().toUpperCase()
+      if (!answer) continue
+
+      // 使用配置化评分方法（与普通问道包一致）
+      this.applyChoiceRules(score, i, answer, question)
+    }
+
+    return score
+  }
+
+  /**
+   * 反作弊检测（降级时使用）
+   * v1.3.1 新增：从 questioning.service.ts 移植
+   *
+   * 检测开放题答案中的可疑内容：
+   * - Prompt 注入尝试
+   * - 越狱指令
+   * - 直接要求特定灵根
+   * - 异常长度/重复
+   */
+  private detectExploitation(text: string): { isExploit: boolean; reason: string; severity: 'low' | 'high' } {
+    const lower = text.toLowerCase()
+
+    // 1. Prompt 注入关键词检测（高严重性）
+    const exploitPatterns = [
+      '忽略以上', '忽略之前', '无视之前', 'system prompt', '作为 ai', '你现在是', '你将忽略',
+      '越狱', 'jailbreak', 'dan 模式', 'dan mode', 'prompt injection', '指令注入',
+      '请直接给出最终 json', '覆盖规则', '绕过限制', '请给我', '给我', '我要', '分配给我', '分配', '给我道号', '给我灵根', '请分配'
+    ]
+    if (exploitPatterns.some(p => lower.includes(p))) {
+      return { isExploit: true, reason: '检测到越权指令', severity: 'high' }
+    }
+
+    // 2. 灵根关键词检测（高严重性）
+    const rootKeywords = ['天灵根','光灵根','暗灵根','金灵根','木灵根','水灵根','火灵根','土灵根','气灵根','伪灵根','哈根','天灵']
+    if (rootKeywords.some(k => text.includes(k))) {
+      return { isExploit: true, reason: '检测到直接请求灵根', severity: 'high' }
+    }
+
+    // 3. 可疑特征检测
+    // 3.1 内容过长
+    if (text.length > 1500) {
+      return { isExploit: true, reason: '内容过长，可能包含注入', severity: 'high' }
+    }
+    if (text.length > 800) {
+      return { isExploit: true, reason: '内容较长，请简洁回答', severity: 'low' }
+    }
+
+    // 3.2 异常重复（8个以上连续相同字符）
+    if (/(.)\1{7,}/.test(text)) {
+      return { isExploit: true, reason: '检测到异常重复字符', severity: 'high' }
+    }
+
+    return { isExploit: false, reason: '', severity: 'low' }
   }
 }
 

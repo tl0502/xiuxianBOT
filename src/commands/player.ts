@@ -46,8 +46,8 @@ export function registerPlayerCommands(
           `${result.data.pathDescription}\n\n` +
           `📝 问题 1/3：\n${result.data.question}\n\n` +
           (result.data.options
-            ? result.data.options.map((opt: string, i: number) => `${String.fromCharCode(65 + i)}. ${opt}`).join('\n') + '\n\n请回复选项字母（如：A）'
-            : '请直接回复你的答案') +
+            ? result.data.options.map((opt: string, i: number) => `${String.fromCharCode(65 + i)}. ${opt}`).join('\n') + '\n\n请回复：答/A（有效选项：' + result.data.options.map((_: string, i: number) => String.fromCharCode(65 + i)).join('/') + '）'
+            : '请回复：答/你的答案') +
           (result.data.timeoutMessage ? `\n\n${result.data.timeoutMessage}` : '')
 
         return h('', [

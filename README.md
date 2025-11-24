@@ -499,6 +499,110 @@ koishi-plugin-xiuxian-txl/
 - 类型安全覆盖率 95%
 - 依赖注入模式，职责清晰
 
+## 灵根分配系统
+
+### 核心设计理念
+
+灵根分配系统基于**公平性算法**设计，确保玩家的性格选择真实影响灵根概率，同时保持稀有度平衡。
+
+### 概率计算公式
+
+#### 1. 性格匹配分数（matchScore）
+
+```
+matchScore = Σ(personality[trait] × weights[trait])
+范围: [-10, +10]
+```
+
+每个灵根在 `spiritual-root-registry.ts` 中配置了性格权重。例如：
+
+| 灵根 | 主要权重配置 |
+|------|-------------|
+| 光灵根 | `kindness:0.5, courage:0.3, greed:-0.5` |
+| 暗灵根 | `focus:0.4, stability:0.4, impatience:-0.3` |
+| 金灵根 | `determination:0.5, courage:0.3` |
+| 木灵根 | `kindness:0.6, honesty:0.3, greed:-0.4` |
+| 水灵根 | `focus:0.5, stability:0.3` |
+| 火灵根 | `courage:0.5, determination:0.3` |
+| 土灵根 | `stability:0.6, honesty:0.3` |
+
+#### 2. 概率调整（adjustment）
+
+```typescript
+if (matchScore > 0) {
+  adjustment = (matchScore / 10) × MAX_PERSONALITY_INCREASE  // 最多 +8%
+} else if (matchScore < 0) {
+  adjustment = (matchScore / 10) × MAX_PERSONALITY_DECREASE  // 最多 -10%
+}
+```
+
+常量配置（`src/config/constants.ts`）：
+- `MAX_PERSONALITY_INCREASE = 0.08` （8%）
+- `MAX_PERSONALITY_DECREASE = 0.10` （10%）
+
+#### 3. 最终概率
+
+```
+finalProb = baseProb + adjustment
+```
+
+所有灵根概率归一化到100%。
+
+#### 4. 示例计算
+
+假设玩家性格分数：`kindness=7, courage=5, greed=2`
+
+对于光灵根（`kindness:0.5, courage:0.3, greed:-0.5`）：
+```
+matchScore = 7×0.5 + 5×0.3 + 2×(-0.5) = 3.5 + 1.5 - 1 = 4.0
+adjustment = (4.0/10) × 0.08 = +3.2%
+```
+
+如果光灵根基础概率是3%，调整后变为 **6.2%**（翻倍）。
+
+### 基础概率分布
+
+| 灵根 | 基础概率 | 可能范围 |
+|------|---------|---------|
+| 光灵根 | 3% | 0% ~ 11% |
+| 暗灵根 | 3% | 0% ~ 11% |
+| 五行灵根（各） | 7% | 0% ~ 15% |
+| 气灵根 | 35.5% | 25.5% ~ 43.5% |
+| 伪灵根 | 23.5% | 13.5% ~ 31.5% |
+
+### 配置化评分（v1.3.1）
+
+步入仙途流程使用配置化评分，确保灵根分配使用正确的性格分数：
+
+1. **选择题评分**：从 `initiation.ts` 问题配置的 `value` 对象直接读取9维打分
+   ```typescript
+   // 示例：initiation.ts 中的 value 对象
+   options: [
+     { text: "全力救治", value: { kindness: 5, honesty: 3 } },
+     { text: "见死不救", value: { greed: 4, manipulation: 3 } }
+   ]
+   ```
+
+2. **开放题评分**：使用AI客观评分（`ai-open-question-scorer.ts`）
+
+3. **流程保证**：
+   - `questioning.service.ts` 调用混合分析器，传入 `path.questions` 以读取配置
+   - `ai-helper.ts` 接收外部性格分数，直接传递给 `FateCalculator`
+   - 无硬编码降级，必须使用配置化评分
+
+### 开发者工具
+
+测试灵根概率分布（`测试灵根 [次数]`）：
+- 选择题使用配置化评分
+- 开放题使用随机分数（模拟AI评分）
+- 统计灵根分布，验证公平性
+
+相关文件：
+- `src/config/spiritual-root-registry.ts` - 灵根注册表（权重配置）
+- `src/utils/fate-calculator.ts` - 天命计算器（概率计算）
+- `src/utils/hybrid-personality-analyzer.ts` - 混合分析器（配置化评分）
+- `src/commands/dev-test.ts` - 测试命令（`测试灵根`）
+
 ## 最近变更
 
 ### 2025-11-23 - v1.2.0 通用冷却系统与流程优化

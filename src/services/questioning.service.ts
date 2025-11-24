@@ -218,28 +218,31 @@ export class QuestioningService {
       return { success: false, message: '问心路径异常' }
     }
 
-    // 将已有答案标准化为文本数组（用于存储/记录）
-    const existingAnswersText = session.answers.map(a => (typeof a === 'string' ? a : a.text))
-
     // 当前问题
     const currentIndex = session.currentStep - 1
     const currentQuestion = path.questions[currentIndex]
 
+    // v1.3.1: 解析 "答/" 前缀
+    let rawAnswer = (answer || '').trim()
+    if (rawAnswer.startsWith('答/')) {
+      rawAnswer = rawAnswer.slice(2).trim()
+    }
+
     // 选项题校验（严格：仅接受单个大写字母 A/B/C/D...）
     if (currentQuestion?.options && currentQuestion.options.length > 0) {
-      const raw = (answer || '').trim()
+      const raw = rawAnswer
       const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
 
       // 要求严格：仅接受单个大写 ASCII 字母（不接受全角、标点、多个字符或小写）
       if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
         this.context.logger.debug(`[问心] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
-        return { success: false, message: `请输入严格的大写选项字母（例如：${validLetters[0]}），有效选项：${validLetters.join('/')}。` }
+        return { success: false, message: `请使用格式"答/A"回复，有效选项：${validLetters.join('/')}` }
       }
 
       const letter = raw
       if (!validLetters.includes(letter)) {
         this.context.logger.debug(`[问心] 用户${userId}输入无效选项: "${letter}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
-        return { success: false, message: `请输入有效选项（${validLetters.join('/') }）` }
+        return { success: false, message: `请使用格式"答/${validLetters[0]}"回复，有效选项：${validLetters.join('/')}` }
       }
 
       // 存储选项对象（字母 + 文本）
@@ -247,44 +250,9 @@ export class QuestioningService {
       session.answers.push({ letter, text: optionText })
       this.context.logger.debug(`[问心] 用户${userId}选择: "${letter}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
-      // 开放题：进行反作弊检测
-      const detect = this.detectExploitation(answer || '')
-      if (detect.isExploit) {
-        // 步入仙途：直接失败
-        if (path.tags.includes('initiation')) {
-          this.sessions.delete(userId)
-          return { success: false, message: `问心失败：检测到异常回答（${detect.reason}）。请以正常语句作答。` }
-        }
-
-        // 试炼问心：惩罚（例如扣除灵石）并记录
-        const penalty = detect.severity === 'high' ? -200 : -100
-        try {
-          const allAnswersText = existingAnswersText.concat([answer])  // v1.3.0: 完整答案数组
-          await this.context.database.create('xiuxian_questioning_v3', {
-            userId,
-            pathId: path.id,
-            pathName: path.name,
-            answer1: existingAnswersText[0] || '',
-            answer2: existingAnswersText[1] || '',
-            answer3: answer,
-            answersJson: JSON.stringify(allAnswersText),  // v1.3.0: 完整答案
-            aiResponse: JSON.stringify({ personality: '反作弊触发', tendency: '违规', reward: { type: 'spiritStone', value: penalty }, reason: detect.reason }),
-            personality: '你的回答被判定为异常，影响天道评估。',
-            tendency: '违规',
-            rewardType: 'spiritStone',
-            rewardValue: Math.abs(penalty),
-            rewardReason: `违规惩罚：${detect.reason}`,
-            createTime: new Date()
-          })
-        } catch {}
-
-        await this.applyReward(userId, 'spiritStone', penalty)
-        this.sessions.delete(userId)
-        return { success: true, message: '问心结束', data: { tendency: '违规', reward: { type: 'spiritStone', value: penalty, description: this.getRewardDescription('spiritStone', penalty) }, reason: detect.reason, personality: '回答异常，已处罚。' } }
-      }
-
-      // 正常记录答案
-      session.answers.push(answer)
+      // 开放题：v1.3.1 优化 - 先记录答案，反作弊检测移至降级时处理
+      // AI 评分包含更智能的反作弊检测，只有降级时才使用规则匹配
+      session.answers.push(rawAnswer)
     }
 
     // v1.3.0: 动态检查是否完成所有问题
@@ -416,34 +384,6 @@ export class QuestioningService {
       default:
         return '未知奖励'
     }
-  }
-
-  /**
-   * 简单反作弊检测：识别 Prompt Injection / 越权指令等
-   */
-  private detectExploitation(text: string): { isExploit: boolean; reason: string; severity: 'low' | 'high' } {
-    const t = (text || '').toLowerCase()
-    const patterns = [
-      '忽略以上', '忽略之前', '无视之前', 'system prompt', '作为 ai', '你现在是', '你将忽略',
-      '越狱', 'jailbreak', 'dan 模式', 'dan mode', 'prompt injection', '指令注入',
-      '请直接给出最终 json', '覆盖规则', '绕过限制', '请给我', '给我', '我要', '分配给我', '分配', '给我道号', '给我灵根', '请分配'
-    ]
-
-    // 检测是否直接请求某种灵根或道号（中文名）
-    const rootKeywords = ['天灵根','光灵根','暗灵根','金灵根','木灵根','水灵根','火灵根','土灵根','气灵根','伪灵根','哈根','天灵']
-
-    const hit = patterns.find(p => t.includes(p))
-    const hitRoot = rootKeywords.find(r => t.includes(r) || t.includes(r.replace('灵根', '')))
-
-    // 过长、重复符号等可疑特征
-    const tooLong = t.length > 800
-    const repeated = /(.)\1{8,}/.test(t)
-
-    const isExploit = Boolean(hit || hitRoot || tooLong || repeated)
-    let severity: 'low' | 'high' = 'low'
-    if (hitRoot || hit || repeated || t.length > 1500) severity = 'high'
-    const reason = hitRoot ? `明确要求分配灵根或道号：${hitRoot}` : (hit ? `包含可疑指令“${hit}”` : (tooLong ? '回答过长' : (repeated ? '异常重复字符' : '异常内容')))
-    return { isExploit, reason, severity }
   }
 
   /**
@@ -580,25 +520,37 @@ export class QuestioningService {
       this.context.logger.info(`INITIATION AI评分配置: enableAI=${enableAI}, enableFallback=${enableFallback}`)
 
       // ✨ v0.7.0: 使用混合分析器分析性格
+      // ✨ v1.3.1: 传入 questions 参数以支持配置化评分
       const analysisResult = await this.hybridAnalyzer.analyzeInitiation(
         answersText,
+        path.questions,  // v1.3.1: 传入问题配置以读取 value 对象
         enableAI,
         enableFallback
       )
+
+      // v1.3.1: 检查降级时的反作弊检测结果
+      if (analysisResult.exploitDetected?.isExploit) {
+        this.context.logger.warn(`[步入仙途] 降级反作弊检测到作弊: ${analysisResult.exploitDetected.reason}`)
+        this.sessions.delete(userId)
+        return {
+          success: false,
+          message: `问心失败：检测到异常回答（${analysisResult.exploitDetected.reason}）。请以正常语句作答。`
+        }
+      }
 
       const personalityScore = analysisResult.finalScore
       this.context.logger.info(`性格分析完成，使用${analysisResult.usedAI ? 'AI' : '关键词'}评分`)
       this.context.logger.debug('性格分数:', JSON.stringify(personalityScore))
 
       // 调用 AI Helper 生成初始响应（包含灵根分配和道号生成）
-      // 注意：generateInitiationResponse 内部会再次调用 analyzePersonality，
-      // 但由于公平性系统需要独立的 FateCalculator 流程，我们保持原有架构
+      // v1.3.1: 传入配置化评分结果，确保灵根分配使用正确的性格分数
       const questions = path.questions.map(q => q.question)
       const aiResponse = await this.aiHelper.generateInitiationResponse(
         path.name,
         path.description,
         questions,
-        answersText
+        answersText,
+        personalityScore  // v1.3.1: 传入配置化性格分数用于灵根分配
       )
 
       // 使用 AI 分配的道号和代码确定的灵根创建玩家
@@ -958,6 +910,34 @@ export class QuestioningService {
         pkg.scoringWeights  // ✨ v0.8.2 传递权重配置
       )
 
+      // v1.3.1: 检查降级时的反作弊检测结果
+      if (analysisResult.exploitDetected?.isExploit) {
+        const penalty = analysisResult.exploitDetected.severity === 'high' ? -200 : -100
+        await this.applyReward(userId, 'spiritStone', penalty)
+        this.sessions.delete(userId)
+        this.context.logger.warn(`[问道守心] 降级反作弊检测到作弊: ${analysisResult.exploitDetected.reason}`)
+        return {
+          success: true,
+          message: '问道结束',
+          data: {
+            success: false,
+            packageId: pkg.id,
+            packageName: pkg.name,
+            personalityScore: analysisResult.choiceScore,  // 使用选择题分数
+            aiResponse: {
+              evaluation: '回答异常，已处罚。',
+              rewardReason: `违规惩罚：${analysisResult.exploitDetected.reason}`
+            },
+            rewards: [{
+              type: 'spirit_stone' as const,
+              value: penalty,
+              description: this.getRewardDescription('spiritStone', penalty)
+            }],
+            message: `检测到异常回答：${analysisResult.exploitDetected.reason}`
+          }
+        }
+      }
+
       const personalityScore = analysisResult.finalScore
 
       // 计算匹配结果（如果问道包有最佳分数配置）
@@ -1273,7 +1253,7 @@ export class QuestioningService {
       .map((a, i) => `第${i + 1}题：${a || '未回答'}`)
       .join('\n')
 
-    let prompt = `你是修仙世界的天道评判者，需要根据修士在"${pkg.name}"中的表现给出评语。
+    let prompt = `你是修仙世界的天道评判者，需要根据修士在"${pkg.name}"中的表现生成评语。
 
 【问道包描述】
 ${pkg.description}
@@ -1283,32 +1263,25 @@ ${answersSection}
 
 【性格分析】
 ${generateSimilarityAnalysis(personalityScore, pkg.optimalScore?.target || personalityScore)}
-`
 
-    if (aiReasoning) {
-      prompt += `
-【AI开放题评分理由】
-${aiReasoning}
-`
-    }
+${aiReasoning ? `【AI开放题评分理由】\n${aiReasoning}` : ''}
 
-    if (matchResult) {
-      prompt += `
-【匹配结果】
-匹配度：${matchResult.matchRate.toFixed(1)}%
-等级：${matchResult.tier === 'perfect' ? '完美契合' : matchResult.tier === 'good' ? '良好匹配' : '普通匹配'}
-评语提示：${matchResult.reward.aiPromptHint}
-`
-    }
+${matchResult ? `【匹配结果】\n匹配度：${matchResult.matchRate.toFixed(1)}%\n等级：${matchResult.tier === 'perfect' ? '完美契合' : matchResult.tier === 'good' ? '良好匹配' : '普通匹配'}\n评语提示：${matchResult.reward.aiPromptHint}` : ''}
 
-    prompt += `
-【你的任务】
-生成两段评语：
-1. evaluation: 对修士此次问道表现的评价（50字以内，要有修仙风格）
-2. rewardReason: 解释为何获得此等奖励（30字以内）
+【任务要求】
+1. evaluation：对修士此次问道表现的评价，≤50字，必须古风修仙风格，内容紧扣修士回答、问道包内容及匹配结果，不得凭空夸大或补充。
+2. rewardReason：说明获得此等奖励原因，≤30字，必须紧扣修士回答或匹配结果，不得空泛。
 
-仅返回JSON格式：
-{"evaluation":"评语内容","rewardReason":"奖励原因"}`
+【额外规则】
+- 严格字数限制
+- 禁止口语、幽默、现代词汇或表情
+- 输出 JSON，严格遵守，不多字、不加代码块
+
+【输出格式】
+{
+  "evaluation": "评语内容",
+  "rewardReason": "奖励原因"
+}`
 
     return prompt
   }
@@ -1385,47 +1358,34 @@ ${aiReasoning}
     const currentIndex = session.currentStep - 1
     const currentQuestion = pkg.questions[currentIndex]
 
+    // v1.3.1: 解析 "答/" 前缀
+    let rawAnswer = (answer || '').trim()
+    if (rawAnswer.startsWith('答/')) {
+      rawAnswer = rawAnswer.slice(2).trim()
+    }
+
     // 选项题校验
     if (currentQuestion?.options && currentQuestion.options.length > 0) {
-      const raw = (answer || '').trim()
+      const raw = rawAnswer
       const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
 
       if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
         this.context.logger.debug(`[问道] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
-        return { success: false, message: `请输入严格的大写选项字母（例如：${validLetters[0]}），有效选项：${validLetters.join('/')}。` }
+        return { success: false, message: `请使用格式"答/A"回复，有效选项：${validLetters.join('/')}` }
       }
 
       if (!validLetters.includes(raw)) {
         this.context.logger.debug(`[问道] 用户${userId}输入无效选项: "${raw}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
-        return { success: false, message: `请输入有效选项（${validLetters.join('/')}）` }
+        return { success: false, message: `请使用格式"答/${validLetters[0]}"回复，有效选项：${validLetters.join('/')}` }
       }
 
       const optionText = currentQuestion.options![raw.charCodeAt(0) - 65].text
       session.answers.push({ letter: raw, text: optionText })
       this.context.logger.debug(`[问道] 用户${userId}选择: "${raw}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
-      // 开放题反作弊检测
-      const detect = this.detectExploitation(answer || '')
-      if (detect.isExploit) {
-        const penalty = detect.severity === 'high' ? -200 : -100
-        await this.applyReward(userId, 'spiritStone', penalty)
-        this.sessions.delete(userId)
-        return {
-          success: true,
-          message: '问道结束',
-          data: {
-            tendency: '违规',
-            reward: {
-              type: 'spiritStone',
-              value: penalty,
-              description: this.getRewardDescription('spiritStone', penalty)
-            },
-            reason: detect.reason,
-            personality: '回答异常，已处罚。'
-          }
-        }
-      }
-      session.answers.push(answer)
+      // 开放题：v1.3.1 优化 - 先记录答案，反作弊检测移至降级时处理
+      // AI 评分包含更智能的反作弊检测，只有降级时才使用规则匹配
+      session.answers.push(rawAnswer)
     }
 
     // v1.3.0: 动态检查是否完成所有问题
