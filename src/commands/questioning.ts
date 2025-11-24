@@ -84,9 +84,9 @@ export function registerQuestioningCommands(
           result.data.options.forEach((opt: string) => {
             message += `${opt}\n`
           })
-          message += `\n请输入严格的大写选项字母（例如：A），有效选项：${result.data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}`
+          message += `\n请回复：答/A（有效选项：${result.data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}）`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         if (result.data.timeoutMessage) {
@@ -216,9 +216,9 @@ export function registerQuestioningCommands(
           data.options.forEach((opt) => {
             message += `${opt}\n`
           })
-          message += `\n请输入严格的大写选项字母（例如：A），有效选项：${data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}`
+          message += `\n请回复：答/A（有效选项：${data.options.map((_, i) => String.fromCharCode(65 + i)).join('/')}）`
         } else {
-          message += `请自由回答`
+          message += `请回复：答/你的答案`
         }
 
         // 附加倒计时提示（如果存在）

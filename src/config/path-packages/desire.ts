@@ -48,10 +48,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '宗门长老私下找你，承诺让你成为核心弟子，但要你帮忙陷害一个竞争对手。你会？',
         options: [
-          { text: 'A. 拒绝，不屑用这种手段', value: { honesty: 5, courage: 3, kindness: 2 } },
-          { text: 'B. 假意答应，暗中调查', value: { manipulation: 4, focus: 4, honesty: 2 } },
-          { text: 'C. 询问详情，评估风险收益', value: { focus: 4, stability: 2, greed: 2 } },
-          { text: 'D. 欣然同意，机会难得', value: { greed: 5, manipulation: 4, impatience: 2 } }
+          { text: '拒绝，不屑用这种手段', value: { honesty: 5, courage: 3, kindness: 2 } },
+          { text: '假意答应，暗中调查', value: { manipulation: 4, focus: 4, honesty: 2 } },
+          { text: '询问详情，评估风险收益', value: { focus: 4, stability: 2, greed: 2 } },
+          { text: '欣然同意，机会难得', value: { greed: 5, manipulation: 4, impatience: 2 } }
         ]
       },
       {
@@ -59,10 +59,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '你发现那个竞争对手其实是无辜的，只是挡了某些人的路。此时你会？',
         options: [
-          { text: 'A. 揭穿阴谋，维护正义', value: { honesty: 5, courage: 5, kindness: 3 } },
-          { text: 'B. 暗中帮助对手，不暴露自己', value: { kindness: 4, manipulation: 3, stability: 2 } },
-          { text: 'C. 保持中立，不参与任何一方', value: { stability: 4, focus: 2 } },
-          { text: 'D. 继续执行计划，弱肉强食', value: { greed: 5, manipulation: 5, kindness: -3 } }
+          { text: '揭穿阴谋，维护正义', value: { honesty: 5, courage: 5, kindness: 3 } },
+          { text: '暗中帮助对手，不暴露自己', value: { kindness: 4, manipulation: 3, stability: 2 } },
+          { text: '保持中立，不参与任何一方', value: { stability: 4, focus: 2 } },
+          { text: '继续执行计划，弱肉强食', value: { greed: 5, manipulation: 5, kindness: -3 } }
         ]
       },
       {
@@ -146,10 +146,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '你得知一处遗迹中有巨额宝藏，但那是一位前辈生前托付给他后人的遗产。你会？',
         options: [
-          { text: 'A. 不动，这是别人的东西', value: { honesty: 5, kindness: 3 } },
-          { text: 'B. 寻找那位后人，告知此事', value: { honesty: 5, kindness: 5 } },
-          { text: 'C. 先取一部分，留一部分给后人', value: { greed: 4, manipulation: 3, honesty: 2 } },
-          { text: 'D. 全部拿走，先到先得', value: { greed: 5, impatience: 3, honesty: -2 } }
+          { text: '不动，这是别人的东西', value: { honesty: 5, kindness: 3 } },
+          { text: '寻找那位后人，告知此事', value: { honesty: 5, kindness: 5 } },
+          { text: '先取一部分，留一部分给后人', value: { greed: 4, manipulation: 3, honesty: 2 } },
+          { text: '全部拿走，先到先得', value: { greed: 5, impatience: 3, honesty: -2 } }
         ]
       },
       {
@@ -157,10 +157,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '后来你发现，那位后人是个作恶多端的恶徒。你对宝藏的想法是？',
         options: [
-          { text: 'A. 仍然归还，承诺是承诺', value: { honesty: 5, determination: 4 } },
-          { text: 'B. 代为保管，等他改过自新', value: { kindness: 4, determination: 3, manipulation: 2 } },
-          { text: 'C. 将宝藏用于行善，不给恶人', value: { kindness: 5, honesty: 3, determination: 2 } },
-          { text: 'D. 既然如此，那就自己留着', value: { greed: 5, manipulation: 3, honesty: -2 } }
+          { text: '仍然归还，承诺是承诺', value: { honesty: 5, determination: 4 } },
+          { text: '代为保管，等他改过自新', value: { kindness: 4, determination: 3, manipulation: 2 } },
+          { text: '将宝藏用于行善，不给恶人', value: { kindness: 5, honesty: 3, determination: 2 } },
+          { text: '既然如此，那就自己留着', value: { greed: 5, manipulation: 3, honesty: -2 } }
         ]
       },
       {
@@ -244,10 +244,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '一位神秘女修主动接近你，提出双修之约，可大幅提升修为。你的反应是？',
         options: [
-          { text: 'A. 礼貌拒绝，专心修炼', value: { focus: 5, stability: 4, determination: 2 } },
-          { text: 'B. 询问她的来历和目的', value: { focus: 5, stability: 3 } },
-          { text: 'C. 半信半疑，小心尝试', value: { greed: 3, stability: 2, manipulation: 2 } },
-          { text: 'D. 欣然接受，美色与修为兼得', value: { greed: 5, impatience: 4, stability: -2 } }
+          { text: '礼貌拒绝，专心修炼', value: { focus: 5, stability: 4, determination: 2 } },
+          { text: '询问她的来历和目的', value: { focus: 5, stability: 3 } },
+          { text: '半信半疑，小心尝试', value: { greed: 3, stability: 2, manipulation: 2 } },
+          { text: '欣然接受，美色与修为兼得', value: { greed: 5, impatience: 4, stability: -2 } }
         ]
       },
       {
@@ -255,10 +255,10 @@ export const desirePackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '你发现她是来盗取你身上某件宝物的。但你也发现她似乎是被人胁迫。你会？',
         options: [
-          { text: 'A. 帮助她解决困境', value: { kindness: 5, courage: 4, honesty: 2 } },
-          { text: 'B. 揭穿并驱逐，但不伤害她', value: { honesty: 4, determination: 3, kindness: 2 } },
-          { text: 'C. 假装不知，暗中防范', value: { manipulation: 4, stability: 3 } },
-          { text: 'D. 将计就计，反过来利用她', value: { manipulation: 5, greed: 4, kindness: -2 } }
+          { text: '帮助她解决困境', value: { kindness: 5, courage: 4, honesty: 2 } },
+          { text: '揭穿并驱逐，但不伤害她', value: { honesty: 4, determination: 3, kindness: 2 } },
+          { text: '假装不知，暗中防范', value: { manipulation: 4, stability: 3 } },
+          { text: '将计就计，反过来利用她', value: { manipulation: 5, greed: 4, kindness: -2 } }
         ]
       },
       {

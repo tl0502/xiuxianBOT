@@ -45,10 +45,10 @@ export const initiationPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '若有一日，你修得大道，你将如何？',
         options: [
-          { text: 'A. 守护世间，济世为怀', value: { kindness: 5, courage: 2, honesty: 2 } },
-          { text: 'B. 独善其身，逍遥自在', value: { stability: 3, focus: 2 } },
-          { text: 'C. 探索天地，求知无尽', value: { focus: 4, stability: 2, determination: 1 } },
-          { text: 'D. 君临万界，至高无上', value: { determination: 3, greed: 5, impatience: 2 } }
+          { text: '守护世间，济世为怀', value: { kindness: 5, courage: 2, honesty: 2 } },
+          { text: '独善其身，逍遥自在', value: { stability: 3, focus: 2 } },
+          { text: '探索天地，求知无尽', value: { focus: 4, stability: 2, determination: 1 } },
+          { text: '君临万界，至高无上', value: { determination: 3, greed: 5, impatience: 2 } }
         ]
       },
       {
@@ -56,10 +56,10 @@ export const initiationPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '在修仙路上，你最害怕失去什么？',
         options: [
-          { text: 'A. 珍视的人', value: { kindness: 4, honesty: 2 } },
-          { text: 'B. 自由意志', value: { determination: 3, stability: 2 } },
-          { text: 'C. 探索真理的机会', value: { focus: 4, stability: 2 } },
-          { text: 'D. 力量与地位', value: { determination: 2, greed: 4 } }
+          { text: '珍视的人', value: { kindness: 4, honesty: 2 } },
+          { text: '自由意志', value: { determination: 3, stability: 2 } },
+          { text: '探索真理的机会', value: { focus: 4, stability: 2 } },
+          { text: '力量与地位', value: { determination: 2, greed: 4 } }
         ]
       },
       {
@@ -99,10 +99,10 @@ export const initiationPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '遇见一位垂危的陌生修士，他身怀重宝，你会？',
         options: [
-          { text: 'A. 全力救治，不问回报', value: { kindness: 5, courage: 2, honesty: 2 } },
-          { text: 'B. 救治后希望获得感谢', value: { stability: 2, focus: 1, greed: 1 } },
-          { text: 'C. 观察情况，权衡利弊', value: { focus: 3, stability: 3, determination: 1 } },
-          { text: 'D. 夺宝而去，弱肉强食', value: { determination: 3, greed: 5, impatience: 2 } }
+          { text: '全力救治，不问回报', value: { kindness: 5, courage: 2, honesty: 2 } },
+          { text: '救治后希望获得感谢', value: { stability: 2, focus: 1, greed: 1 } },
+          { text: '观察情况，权衡利弊', value: { focus: 3, stability: 3, determination: 1 } },
+          { text: '夺宝而去，弱肉强食', value: { determination: 3, greed: 5, impatience: 2 } }
         ]
       },
       {
@@ -110,10 +110,10 @@ export const initiationPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '面对远超你的强敌，你会如何应对？',
         options: [
-          { text: 'A. 奋力一战，虽死无悔', value: { courage: 5, determination: 2 } },
-          { text: 'B. 寻找援助，智取对手', value: { focus: 4, stability: 2 } },
-          { text: 'C. 暂时撤退，积蓄实力', value: { stability: 5, focus: 2 } },
-          { text: 'D. 低头臣服，待机而动', value: { determination: 3, focus: 2 } }
+          { text: '奋力一战，虽死无悔', value: { courage: 5, determination: 2 } },
+          { text: '寻找援助，智取对手', value: { focus: 4, stability: 2 } },
+          { text: '暂时撤退，积蓄实力', value: { stability: 5, focus: 2 } },
+          { text: '低头臣服，待机而动', value: { determination: 3, focus: 2 } }
         ]
       },
       {

@@ -1,9 +1,8 @@
 import { Context } from 'koishi'
-import { InitiationAIResponse, TrialAIResponse } from '../types/ai-response'
-import { Player } from '../types/player'
+import { InitiationAIResponse } from '../types/ai-response'
 import { SpiritualRootType, SPIRITUAL_ROOTS } from '../config/spiritual-roots'
 import { FateCalculator } from './fate-calculator'
-import { analyzePersonality, getPersonalityDescription } from './personality-analyzer'
+import { getPersonalityDescription, PersonalityScore } from './personality-analyzer'
 import { AIConfig } from '../config/constants'
 
 /**
@@ -23,17 +22,20 @@ export class AIHelper {
    * 1. 代码量化分析性格
    * 2. 代码根据公平性算法确定灵根（天命系统）
    * 3. AI 只负责生成道号和性格评语
+   *
+   * v1.3.1 更新：必须接收外部传入的性格分数（配置化评分）
    */
   async generateInitiationResponse(
     _pathName: string,
     _pathDescription: string,
     _questions: string[],
-    answers: string[]
+    answers: string[],
+    personalityScore: PersonalityScore  // v1.3.1: 必须传入性格分数
   ): Promise<InitiationAIResponse> {
     try {
-      // v1.3.0: 直接使用9维性格系统
-      this.ctx.logger('xiuxian').info('使用 9维性格量化系统')
-      return await this.generateInitiationResponseV1(answers)
+      // v1.3.1: 使用外部传入的配置化性格分数
+      this.ctx.logger('xiuxian').info('使用 9维性格量化系统（配置化评分）')
+      return await this.generateInitiationResponseV1(answers, personalityScore)
     } catch (error) {
       this.ctx.logger('xiuxian').error('AI 评估失败:', error)
 
@@ -53,15 +55,19 @@ export class AIHelper {
 
   /**
    * v1.0 版本：9维性格系统 + 固定选项加分
+   * v1.3.1 更新：必须接收外部传入的性格分数（配置化评分）
    */
-  private async generateInitiationResponseV1(answers: string[]): Promise<InitiationAIResponse> {
+  private async generateInitiationResponseV1(
+    answers: string[],
+    personalityScore: PersonalityScore  // v1.3.1: 必须传入性格分数
+  ): Promise<InitiationAIResponse> {
     this.ctx.logger('xiuxian').info('调用 AI 评估步入仙途...')
-    this.ctx.logger('xiuxian').info('=== 公平性系统：代码控制灵根分配（v1.0）===')
+    this.ctx.logger('xiuxian').info('=== 公平性系统：代码控制灵根分配（v1.3.1）===')
 
-    // 【第1步】量化分析性格（9维）
-    const personality = analyzePersonality(answers)
+    // 【第1步】使用外部传入的配置化评分结果
+    const personality = personalityScore
     const personalityDesc = getPersonalityDescription(personality)
-    this.ctx.logger('xiuxian').info(`性格分析完成：${personalityDesc}`)
+    this.ctx.logger('xiuxian').info(`性格分析完成（配置化评分）：${personalityDesc}`)
 
     // 【第2步】使用天命计算器确定灵根（公平性保证）
     const fateCalculator = new FateCalculator(this.ctx)
@@ -94,43 +100,6 @@ export class AIHelper {
     const result = this.parseInitiationResponse(response, selectedRoot)
 
     return result
-  }
-
-  /**
-   * 调用 ChatLuna 生成试炼问心评估（奖励评估）
-   */
-  async generateQuestioningResponse(
-    _pathName: string,
-    _pathDescription: string,
-    _questions: string[],
-    _answers: string[],
-    _player: Player
-  ): Promise<TrialAIResponse> {
-    try {
-      this.ctx.logger('xiuxian').info('调用 AI 评估问心结果...')
-
-      // 调用 ChatLuna
-      const response = await this.callChatLunaForTrial()
-
-      // 解析 JSON 响应
-      const result = this.parseTrialResponse(response)
-
-      return result
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('AI 评估失败:', error)
-
-      // ✨ v0.9.2 检查是否允许降级
-      const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
-      if (!enableFallback) {
-        // 不允许降级，重新抛出错误
-        this.ctx.logger('xiuxian').error('试炼问心AI评估失败，且未启用降级模式')
-        throw new Error('AI服务不可用，且未启用降级模式')
-      }
-
-      // 允许降级，返回默认奖励
-      this.ctx.logger('xiuxian').warn('使用默认响应作为降级方案')
-      return this.getDefaultTrialResponse()
-    }
   }
 
   /**
@@ -177,59 +146,51 @@ export class AIHelper {
         .join('\n')
 
       // 构建简化版 prompt - AI 只负责道号和评语
-      const prompt =  `你是修仙世界的"天道判官",负责根据新入门修士的性格与灵根赐予【道号】与【评价】。
-【修士回答】
+      const prompt =  `你是修仙世界的天道判官，负责根据修士三题回答与已分配灵根生成【道号】、【性格评语】和【天道反馈】。输出必须严格遵循 JSON。
+
+【输入】
+修士回答：
 ${answersSection}
 
-【性格】
-系统已量化分析修士性格：${personalityDesc}
+量化性格：
+${personalityDesc}
 
-【已分配灵根】
-天道已定：${rootInfo.name}(${selectedRoot})
-灵根特征：${rootInfo.description}
+已分配灵根：
+${rootInfo.name}(${selectedRoot})
+特征：${rootInfo.description}
 
-【你的任务】
-1. **道号(daoName)**:
-   - 2-4个汉字
-   - 结合修士的回答和已分配的灵根
-   - 避免使用常见俗套的名字
+【评分规则】
+1. 内容分析
+- 严格基于回答和性格分，不允许脑补、夸大或补全未出现动机
+- 对低俗、脏话或无意义回答直接标记为“异常/敷衍”
+- 对敷衍/异常回答，道号可使用中性占位名（例子:『草木』『未知』等中性道号。），天道反馈给出警示性提示
 
-2. **性格评语(personality)**:
-   - 50字以内,深入评价修士的性格和修仙潜力
-   - 结合三个问题的回答，全面分析
+2. 道号 (daoName)
+- 2~4个汉字
+- 与回答及灵根特征紧密关联
+- 不使用俗套、重复、无意义词
+- 异常回答使用安全中性道号
 
-3.生成“天道反馈(reason)”，必须严格按以下结构输出：
+3. 性格评语 (personality)
+- ≤50字
+- 严格基于回答和性格分
+- 可正面或中性，不夸奖潜力、不幽默、不口语
+- 异常回答可提示谨慎或待端正
 
- 1. 开头固定句式：
-   经天鉴，该修士……
-   - 接一段正面或中性的古风描述（必写）
-   - 内容基于：性格 + 修士回答 + 灵根
-   - 不得写负面，不得口语
+4. 天道反馈 (reason)
+- 开头：经天鉴，该修士……
+- 分析回答及性格特征
+- 异常回答可加入轻微提醒，如“言辞不当，修炼之志尚待端正”
+- 宣告道号：赐予道号『(daoName)』！
+- 祝福语：愿道友……（可中性或温和，不强制积极，结合灵根特征或性格）
+- 输出古风，无表情，无口语
 
- 2. “但……”句（可省略）
-   - 仅当第3题回答敷衍或有作弊倾向时加入
-   - 只写一句轻微提醒，不得严厉
-   - 若未触发条件，整句完全省略
-
- 3. 道号宣告（必写）：
-   赐予道号『{{daoName}}』！
-
- 4. 祝福语（必写）：
-   句式：愿道友……
-   - 内容结合性格与灵根写一句积极、古风的祝福
-
-整体要求：
-- 古风、庄重、像天道宣旨
-- 不可口语、可幽默、不可写表情
-
-【额外规则 · 必须遵守】
-- 不得修改灵根，不得提出灵根建议
-- 所有输出必须由修士的回答推导
-- 内容必须符合修仙世界观
-- 必须返回 **纯 JSON**，不得多字
-
-【返回格式】
-{"daoName":"道号","personality":"性格评语","reason":"天道反馈"}`
+【输出格式】
+{
+  "daoName": "道号",
+  "personality": "性格评语（≤50字，基于回答）",
+  "reason": "经天鉴，该修士……[正面或中性描述][(可选)提醒][赐予道号『daoName』][祝福语]"
+}`
 
       // 调用 AI 服务
       const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
@@ -251,57 +212,6 @@ ${answersSection}
     // 回退到模拟响应
     this.ctx.logger('xiuxian').warn('AI 调用失败，降级使用模拟响应')
     return this.getMockInitiationResponse(answers, selectedRoot)
-  }
-
-  /**
-   * 调用 ChatLuna - 试炼问心模式
-   */
-  private async callChatLunaForTrial(): Promise<string> {
-    const aiService = this.ctx.xiuxianAI
-    if (!aiService || !aiService.isAvailable()) {
-      // ✨ v0.9.2 检查是否允许降级
-      const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
-      if (!enableFallback) {
-        this.ctx.logger('xiuxian').error('AI 服务不可用，且未启用降级模式')
-        throw new Error('AI服务不可用，且未启用降级模式')
-      }
-      this.ctx.logger('xiuxian').warn('AI 服务未初始化，使用模拟响应')
-      return this.getMockTrialResponse()
-    }
-
-    try {
-      this.ctx.logger('xiuxian').info('通过 ChatLuna 调用 AI（试炼问心）')
-
-      const prompt = `你是一个修仙世界的天道判官，负责评估修士的问心试炼。
-
-请生成 JSON 响应：
-1. personality（性格评语）：评价修士在试炼中展现的性格
-2. tendency（问心倾向）：修士的修行倾向，如"智慧型"、"战斗型"等
-3. reward（奖励）：包含 type（"cultivation"或"spiritStone"）和 value（数值，200-500）
-4. reason（奖励原因）：说明为什么给予这个奖励
-
-仅返回 JSON 对象。格式：
-{"personality":"性格评语","tendency":"问心倾向","reward":{"type":"cultivation","value":300},"reason":"奖励原因"}`
-
-      const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
-      if (response) {
-        this.ctx.logger('xiuxian').info('AI 响应成功')
-        return response
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('调用 ChatLuna 失败:', error)
-    }
-
-    // AI 调用失败，检查是否允许降级
-    const enableFallback = this.pluginConfig?.enableAIEvaluationFallback ?? true
-    if (!enableFallback) {
-      this.ctx.logger('xiuxian').error('AI 调用失败，且未启用降级模式')
-      throw new Error('AI调用失败，且未启用降级模式')
-    }
-
-    // 回退到模拟响应
-    this.ctx.logger('xiuxian').warn('AI 调用失败，降级使用模拟响应')
-    return this.getMockTrialResponse()
   }
 
   /**
@@ -378,21 +288,6 @@ ${answersSection}
   }
 
   /**
-   * 获取模拟试炼问心响应（用于测试）
-   */
-  private getMockTrialResponse(): string {
-    return JSON.stringify({
-      personality: '你的回答体现出对修仙本质的深刻理解，道心坚定，不为外物所动。',
-      tendency: '智慧型修仙者',
-      reward: {
-        type: 'cultivation',
-        value: 300
-      },
-      reason: '问心诚恳，天道有感，赐予修为奖励'
-    })
-  }
-
-  /**
    * 解析步入仙途 AI 响应
    *
    * 注意：灵根由外部代码确定，AI 只负责道号和评语
@@ -429,39 +324,6 @@ ${answersSection}
   }
 
   /**
-   * 解析试炼问心 AI 响应
-   */
-  private parseTrialResponse(response: string): TrialAIResponse {
-    try {
-      // 提取 JSON 部分（可能有前后文字）
-      const jsonMatch = response.match(/\{[\s\S]*\}/)
-      if (!jsonMatch) {
-        throw new Error('未找到 JSON 格式响应')
-      }
-
-      const parsed = JSON.parse(jsonMatch[0])
-
-      // 验证必需字段
-      if (!parsed.personality || !parsed.tendency || !parsed.reward || !parsed.reason) {
-        throw new Error('AI 响应缺少必需字段')
-      }
-
-      return {
-        personality: parsed.personality,
-        tendency: parsed.tendency,
-        reward: {
-          type: parsed.reward.type,
-          value: Number(parsed.reward.value)
-        },
-        reason: parsed.reason
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').error('解析试炼问心 AI 响应失败:', error)
-      return this.getDefaultTrialResponse()
-    }
-  }
-
-  /**
    * 获取默认步入仙途响应（发生错误时）
    *
    * 如果没有提供 selectedRoot，则使用公平性系统确定
@@ -488,21 +350,6 @@ ${answersSection}
       spiritualRoot: selectedRoot,
       personality: '你踏入仙途，天道感知你的初心，为你指引前路。',
       reason: `根据你的回答，天道为你安排了${rootInfo.name}`
-    }
-  }
-
-  /**
-   * 获取默认试炼问心响应（发生错误时）
-   */
-  private getDefaultTrialResponse(): TrialAIResponse {
-    return {
-      personality: '你完成了问心试炼，对修仙之道有了更深的理解。',
-      tendency: '求道者',
-      reward: {
-        type: 'cultivation',
-        value: 200
-      },
-      reason: '完成问心，获得修为奖励'
     }
   }
 
@@ -545,89 +392,6 @@ ${answersSection}
       this.ctx.logger('xiuxian').warn(`第三题答案过长 (${answers[2].length} 字符)，可能是注入攻击`)
       // 截断过长的答案
       answers[2] = answers[2].substring(0, 200) + '...(已截断)'
-    }
-  }
-
-  /**
-   * 生成问道包评语
-   * 用于新的Tag系统问道包
-   */
-  async generatePackageEvaluationResponse(
-    packageName: string,
-    packageDescription: string,
-    answers: string[],
-    matchRate: number,
-    tier: 'perfect' | 'good' | 'normal',
-    aiPromptHint: string
-  ): Promise<{ evaluation: string; rewardReason: string }> {
-    const aiService = this.ctx.xiuxianAI
-
-    // 检查 AI 服务是否可用
-    if (!aiService || !aiService.isAvailable()) {
-      // AI 不可用，使用默认评语
-      return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-    }
-
-    try {
-      const tierText = tier === 'perfect' ? '完美契合' : tier === 'good' ? '良好匹配' : '普通匹配'
-
-      const prompt = `你是修仙世界的天道评判者，需要根据修士在"${packageName}"中的表现给出评语。
-
-【问道包描述】
-${packageDescription}
-
-【修士回答】
-${answers.map((a, i) => `第${i + 1}题：${a || '未回答'}`).join('\n')}
-
-【匹配结果】
-匹配度：${matchRate.toFixed(1)}%
-等级：${tierText}
-评语提示：${aiPromptHint}
-
-【你的任务】
-生成两段评语：
-1. evaluation: 对修士此次问道表现的评价（50字以内，要有修仙风格）
-2. rewardReason: 解释为何获得此等奖励（30字以内）
-
-仅返回JSON格式：
-{"evaluation":"评语内容","rewardReason":"奖励原因"}`
-
-      const response = await aiService.generate(prompt, AIConfig.PACKAGE_EVALUATION_TIMEOUT)
-
-      // 检查响应是否为空
-      if (!response) {
-        this.ctx.logger('xiuxian').warn('AI返回空响应，使用默认评语')
-        return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-      }
-
-      // 解析响应
-      const parsed = JSON.parse(response) as { evaluation?: string; rewardReason?: string }
-      return {
-        evaluation: parsed.evaluation || '问道完成',
-        rewardReason: parsed.rewardReason || '完成问道'
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').warn('问道包AI评语生成失败，使用默认评语')
-      return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-    }
-  }
-
-  /**
-   * 获取默认问道包评语
-   */
-  private getDefaultPackageEvaluation(
-    tier: 'perfect' | 'good' | 'normal',
-    aiPromptHint: string
-  ): { evaluation: string; rewardReason: string } {
-    const evaluations = {
-      perfect: '你的心性与此机缘完美契合，天道为之侧目！',
-      good: '你的表现尚可，虽有不足，但已有所得。',
-      normal: '此次机缘与你尚有距离，需继续修行。'
-    }
-
-    return {
-      evaluation: evaluations[tier],
-      rewardReason: aiPromptHint || '完成问道'
     }
   }
 }

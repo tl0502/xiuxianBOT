@@ -28,15 +28,3 @@ export interface InitiationAIResponse {
   personality: string      // 性格评语
   reason: string          // 分配理由
 }
-
-/**
- * AI 响应 - 试炼问心
- *
- * 用于试炼问心流程中的 AI 评估响应
- */
-export interface TrialAIResponse {
-  personality: string      // 性格评语
-  tendency: string        // 问心倾向
-  reward: QuestioningReward  // 奖励
-  reason: string          // 奖励原因
-}
