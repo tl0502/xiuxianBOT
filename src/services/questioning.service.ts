@@ -222,36 +222,43 @@ export class QuestioningService {
     const currentIndex = session.currentStep - 1
     const currentQuestion = path.questions[currentIndex]
 
-    // v1.3.1: 解析 "答/" 前缀
-    let rawAnswer = (answer || '').trim()
-    if (rawAnswer.startsWith('答/')) {
-      rawAnswer = rawAnswer.slice(2).trim()
+    // v1.3.1: 检查是否使用"答/"前缀
+    const rawInput = (answer || '').trim()
+
+    // 如果没有"答/"前缀，忽略该消息（不处理，让玩家正常聊天）
+    if (!rawInput.startsWith('答/')) {
+      return { success: false, message: '' }  // 空消息表示忽略，不提示
     }
+
+    // 解析"答/"后的内容
+    const rawAnswer = rawInput.slice(2).trim()
 
     // 选项题校验（严格：仅接受单个大写字母 A/B/C/D...）
     if (currentQuestion?.options && currentQuestion.options.length > 0) {
-      const raw = rawAnswer
       const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
 
       // 要求严格：仅接受单个大写 ASCII 字母（不接受全角、标点、多个字符或小写）
-      if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
+      if (rawAnswer.length !== 1 || !/^[A-Z]$/.test(rawAnswer)) {
         this.context.logger.debug(`[问心] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
         return { success: false, message: `请使用格式"答/A"回复，有效选项：${validLetters.join('/')}` }
       }
 
-      const letter = raw
-      if (!validLetters.includes(letter)) {
-        this.context.logger.debug(`[问心] 用户${userId}输入无效选项: "${letter}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
+      if (!validLetters.includes(rawAnswer)) {
+        this.context.logger.debug(`[问心] 用户${userId}输入无效选项: "${rawAnswer}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
         return { success: false, message: `请使用格式"答/${validLetters[0]}"回复，有效选项：${validLetters.join('/')}` }
       }
 
       // 存储选项对象（字母 + 文本）
-      const optionText = currentQuestion.options![letter.charCodeAt(0) - 65].text
-      session.answers.push({ letter, text: optionText })
-      this.context.logger.debug(`[问心] 用户${userId}选择: "${letter}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
+      const optionText = currentQuestion.options![rawAnswer.charCodeAt(0) - 65].text
+      session.answers.push({ letter: rawAnswer, text: optionText })
+      this.context.logger.debug(`[问心] 用户${userId}选择: "${rawAnswer}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
       // 开放题：v1.3.1 优化 - 先记录答案，反作弊检测移至降级时处理
       // AI 评分包含更智能的反作弊检测，只有降级时才使用规则匹配
+      if (!rawAnswer || rawAnswer.length === 0) {
+        this.context.logger.debug(`[问心] 用户${userId}开放题答案为空: "${answer}", currentStep=${session.currentStep}`)
+        return { success: false, message: '请使用格式"答/你的答案"回复，答案不能为空' }
+      }
       session.answers.push(rawAnswer)
     }
 
@@ -1358,33 +1365,41 @@ ${matchResult ? `【匹配结果】\n匹配度：${matchResult.matchRate.toFixed
     const currentIndex = session.currentStep - 1
     const currentQuestion = pkg.questions[currentIndex]
 
-    // v1.3.1: 解析 "答/" 前缀
-    let rawAnswer = (answer || '').trim()
-    if (rawAnswer.startsWith('答/')) {
-      rawAnswer = rawAnswer.slice(2).trim()
+    // v1.3.1: 检查是否使用"答/"前缀
+    const rawInput = (answer || '').trim()
+
+    // 如果没有"答/"前缀，忽略该消息（不处理，让玩家正常聊天）
+    if (!rawInput.startsWith('答/')) {
+      return { success: false, message: '' }  // 空消息表示忽略，不提示
     }
+
+    // 解析"答/"后的内容
+    const rawAnswer = rawInput.slice(2).trim()
 
     // 选项题校验
     if (currentQuestion?.options && currentQuestion.options.length > 0) {
-      const raw = rawAnswer
       const validLetters = Array.from({ length: currentQuestion.options.length }, (_, i) => String.fromCharCode(65 + i))
 
-      if (raw.length !== 1 || !/^[A-Z]$/.test(raw)) {
+      if (rawAnswer.length !== 1 || !/^[A-Z]$/.test(rawAnswer)) {
         this.context.logger.debug(`[问道] 用户${userId}输入格式错误: "${answer}", currentStep=${session.currentStep}`)
         return { success: false, message: `请使用格式"答/A"回复，有效选项：${validLetters.join('/')}` }
       }
 
-      if (!validLetters.includes(raw)) {
-        this.context.logger.debug(`[问道] 用户${userId}输入无效选项: "${raw}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
+      if (!validLetters.includes(rawAnswer)) {
+        this.context.logger.debug(`[问道] 用户${userId}输入无效选项: "${rawAnswer}", 有效选项: ${validLetters.join('/')}, currentStep=${session.currentStep}`)
         return { success: false, message: `请使用格式"答/${validLetters[0]}"回复，有效选项：${validLetters.join('/')}` }
       }
 
-      const optionText = currentQuestion.options![raw.charCodeAt(0) - 65].text
-      session.answers.push({ letter: raw, text: optionText })
-      this.context.logger.debug(`[问道] 用户${userId}选择: "${raw}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
+      const optionText = currentQuestion.options![rawAnswer.charCodeAt(0) - 65].text
+      session.answers.push({ letter: rawAnswer, text: optionText })
+      this.context.logger.debug(`[问道] 用户${userId}选择: "${rawAnswer}", currentStep=${session.currentStep} → ${session.currentStep + 1}`)
     } else {
       // 开放题：v1.3.1 优化 - 先记录答案，反作弊检测移至降级时处理
       // AI 评分包含更智能的反作弊检测，只有降级时才使用规则匹配
+      if (!rawAnswer || rawAnswer.length === 0) {
+        this.context.logger.debug(`[问道] 用户${userId}开放题答案为空: "${answer}", currentStep=${session.currentStep}`)
+        return { success: false, message: '请使用格式"答/你的答案"回复，答案不能为空' }
+      }
       session.answers.push(rawAnswer)
     }
 

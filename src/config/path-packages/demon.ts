@@ -48,10 +48,10 @@ export const demonPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '心魔以你最深的执念化形，许诺实现你的愿望。你会？',
         options: [
-          { text: 'A. 坚守本心，拒绝诱惑', value: { honesty: 5, determination: 4, stability: 2 } },
-          { text: 'B. 虚与委蛇，寻找破绽', value: { focus: 4, manipulation: 3 } },
-          { text: 'C. 细听条件，再做决定', value: { focus: 3, greed: 2, stability: 1 } },
-          { text: 'D. 直接接受，力量就是一切', value: { greed: 5, impatience: 4, determination: 2 } }
+          { text: '坚守本心，拒绝诱惑', value: { honesty: 5, determination: 4, stability: 2 } },
+          { text: '虚与委蛇，寻找破绽', value: { focus: 4, manipulation: 3 } },
+          { text: '细听条件，再做决定', value: { focus: 3, greed: 2, stability: 1 } },
+          { text: '直接接受，力量就是一切', value: { greed: 5, impatience: 4, determination: 2 } }
         ]
       },
       {
@@ -59,10 +59,10 @@ export const demonPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '心魔展示了一条捷径：以他人为祭，可获强大力量。你的反应是？',
         options: [
-          { text: 'A. 宁死不从，这违背我的道', value: { honesty: 5, courage: 5, kindness: 3 } },
-          { text: 'B. 询问是否有其他方法', value: { focus: 4, stability: 2 } },
-          { text: 'C. 沉默不语，内心挣扎', value: { honesty: 2, stability: 2, manipulation: 1 } },
-          { text: 'D. 弱者存在的意义就是成为强者的养分', value: { greed: 5, manipulation: 5, kindness: -3 } }
+          { text: '宁死不从，这违背我的道', value: { honesty: 5, courage: 5, kindness: 3 } },
+          { text: '询问是否有其他方法', value: { focus: 4, stability: 2 } },
+          { text: '沉默不语，内心挣扎', value: { honesty: 2, stability: 2, manipulation: 1 } },
+          { text: '弱者存在的意义就是成为强者的养分', value: { greed: 5, manipulation: 5, kindness: -3 } }
         ]
       },
       {
@@ -146,10 +146,10 @@ export const demonPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '翻开禁书，你发现其中功法威力惊人但需吸取生灵精元。你会？',
         options: [
-          { text: 'A. 立即销毁，这是祸害', value: { honesty: 5, courage: 3, kindness: 2 } },
-          { text: 'B. 收藏研究，知己知彼', value: { focus: 5, stability: 3 } },
-          { text: 'C. 尝试改良，去其糟粕', value: { focus: 4, determination: 3, kindness: 2 } },
-          { text: 'D. 照修不误，力量至上', value: { greed: 5, manipulation: 4, kindness: -3 } }
+          { text: '立即销毁，这是祸害', value: { honesty: 5, courage: 3, kindness: 2 } },
+          { text: '收藏研究，知己知彼', value: { focus: 5, stability: 3 } },
+          { text: '尝试改良，去其糟粕', value: { focus: 4, determination: 3, kindness: 2 } },
+          { text: '照修不误，力量至上', value: { greed: 5, manipulation: 4, kindness: -3 } }
         ]
       },
       {
@@ -157,10 +157,10 @@ export const demonPackages: PathPackageTemplate[] = [
         type: 'choice',
         question: '书中有一页记载了可以不伤生灵的变通之法，但修炼速度会大减。你的选择是？',
         options: [
-          { text: 'A. 采用变通之法，稳步前进', value: { stability: 5, honesty: 4, kindness: 2 } },
-          { text: 'B. 仍然销毁，不想沾染邪术', value: { honesty: 5, courage: 3 } },
-          { text: 'C. 两种都尝试，比较效果', value: { focus: 3, greed: 2, manipulation: 2 } },
-          { text: 'D. 原版效率更高，变通法太慢', value: { greed: 5, impatience: 4, kindness: -2 } }
+          { text: '采用变通之法，稳步前进', value: { stability: 5, honesty: 4, kindness: 2 } },
+          { text: '仍然销毁，不想沾染邪术', value: { honesty: 5, courage: 3 } },
+          { text: '两种都尝试，比较效果', value: { focus: 3, greed: 2, manipulation: 2 } },
+          { text: '原版效率更高，变通法太慢', value: { greed: 5, impatience: 4, kindness: -2 } }
         ]
       },
       {

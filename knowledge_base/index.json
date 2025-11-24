@@ -1,0 +1,97 @@
+{
+  "_meta": {
+    "title": "太虚九州修仙世界 - AI 知识库",
+    "version": "2.0",
+    "last_updated": "2025-11-24",
+    "description": "供 AI 使用的知识库，用于理解游戏世界观、回应玩家询问、生成符合设定的内容",
+    "usage": "AI 应根据玩家询问的内容查询相应章节，使用知识库内容保持回应的一致性和准确性"
+  },
+  "getting_started": {
+    "id": "readme",
+    "title": "AI 使用指南（必读）",
+    "path": "README.md",
+    "priority": "highest",
+    "description": "知识库总览、使用原则、快速索引"
+  },
+  "world": [
+    {
+      "id": "universe",
+      "title": "太虚九州世界观",
+      "path": "world/universe.md",
+      "keywords": ["世界", "地理", "九州", "灵气", "时代背景"],
+      "use_when": "玩家询问世界背景、地理、探索地点"
+    },
+    {
+      "id": "factions",
+      "title": "宗门与势力",
+      "path": "world/factions.md",
+      "keywords": ["宗门", "门派", "势力", "太初剑宗", "灵荷谷", "九黎魔殿"],
+      "use_when": "玩家询问宗门信息、推荐修行方向、生成问道内容"
+    },
+    {
+      "id": "magic_rules",
+      "title": "灵力与修炼体系",
+      "path": "world/magic_rules.md",
+      "keywords": ["灵力", "修炼", "术法", "突破", "境界", "丹药"],
+      "use_when": "玩家询问修炼机制、术法、突破、道具"
+    }
+  ],
+  "characters": [
+    {
+      "id": "roots",
+      "title": "灵根设定",
+      "path": "characters/roots.md",
+      "keywords": ["灵根", "金木水火土", "气光暗", "哈根", "性格", "修行方向"],
+      "use_when": "玩家询问灵根信息、推荐修行路线、生成问道内容"
+    }
+  ],
+  "mechanics": [
+    {
+      "id": "scoring",
+      "title": "心性评分系统",
+      "path": "mechanics/scoring.md",
+      "keywords": ["问道", "心性", "评分", "九维", "匹配度", "奖励"],
+      "use_when": "生成问道反馈、解释评价结果、说明奖励"
+    },
+    {
+      "id": "command_rules",
+      "title": "指令系统",
+      "path": "mechanics/command_rules.md",
+      "keywords": ["指令", "命令", "步入仙途", "问道", "打坐", "突破", "天道记录"],
+      "use_when": "玩家询问指令用法、需要引导玩家使用指令"
+    },
+    {
+      "id": "event_triggers",
+      "title": "事件触发与话术",
+      "path": "mechanics/event_triggers.md",
+      "keywords": ["事件", "话术", "冷却", "失败", "成功", "限制", "错误处理"],
+      "use_when": "遇到特殊场景需要标准回应话术"
+    }
+  ],
+  "logs": [
+    {
+      "id": "session1",
+      "title": "示例对话：步入仙途",
+      "path": "logs/session1.md",
+      "keywords": ["步入仙途", "创建角色", "入门问心", "对话流程", "风格示例"],
+      "use_when": "需要学习步入仙途的完整流程和语气风格"
+    },
+    {
+      "id": "session2",
+      "title": "示例对话：问道守心",
+      "path": "logs/session2.md",
+      "keywords": ["问道守心", "问道流程", "评价方式", "奖励示例", "对话风格"],
+      "use_when": "需要学习问道守心的完整流程和评价方式"
+    }
+  ],
+  "quick_reference": {
+    "player_asks_about_world": "→ world/universe.md",
+    "player_asks_about_factions": "→ world/factions.md",
+    "player_asks_about_roots": "→ characters/roots.md",
+    "player_asks_about_cultivation": "→ world/magic_rules.md",
+    "player_asks_about_commands": "→ mechanics/command_rules.md",
+    "generate_questioning_feedback": "→ mechanics/scoring.md",
+    "handle_cooldown_or_errors": "→ mechanics/event_triggers.md",
+    "learn_dialogue_style": "→ logs/session1.md, logs/session2.md"
+  }
+}

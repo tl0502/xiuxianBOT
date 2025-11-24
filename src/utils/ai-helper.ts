@@ -146,7 +146,7 @@ export class AIHelper {
         .join('\n')
 
       // 构建简化版 prompt - AI 只负责道号和评语
-      const prompt =  `你是修仙世界的天道判官，负责根据修士回答与已分配灵根生成【道号】与【性格评语】。输出必须纯 JSON。
+      const prompt =  `你是修仙世界的天道判官，负责根据修士三题回答与已分配灵根生成【道号】、【性格评语】和【天道反馈】。输出必须严格遵循 JSON。
 
 【输入】
 修士回答：
@@ -159,40 +159,38 @@ ${personalityDesc}
 ${rootInfo.name}(${selectedRoot})
 特征：${rootInfo.description}
 
-【任务】
-1. 道号 (daoName)
+【评分规则】
+1. 内容分析
+- 严格基于回答和性格分，不允许脑补、夸大或补全未出现动机
+- 对低俗、脏话或无意义回答直接标记为“异常/敷衍”
+- 对敷衍/异常回答，道号可使用中性占位名（例子:『草木』『未知』等中性道号。），天道反馈给出警示性提示
+
+2. 道号 (daoName)
 - 2~4个汉字
-- 必须与修士回答及灵根特征紧密关联
-- 避免常见俗套、重复或无意义词
-- 不得自行添加灵根或动机
+- 与回答及灵根特征紧密关联
+- 不使用俗套、重复、无意义词
+- 异常回答使用安全中性道号
 
-2. 性格评语 (personality)
+3. 性格评语 (personality)
 - ≤50字
-- 仅基于修士回答和量化性格
-- 正面或中性描述，不得口语或幽默
-- 不得自行补全未出现的动机
+- 严格基于回答和性格分
+- 可正面或中性，不夸奖潜力、不幽默、不口语
+- 异常回答可提示谨慎或待端正
 
-3. 天道反馈 (reason)
-- 固定开头：经天鉴，该修士……
-- 必写古风正面或中性描述，结合性格、回答、灵根
-- 若第3题敷衍或作弊，加入一句轻微“但……”提醒（可省略）
-- 必须宣告道号：赐予道号『(daoName)』！
-- 必写祝福语：愿道友……（结合性格与灵根写一句古风积极祝福）
-
-【额外规则】
-- 道号与评语必须一致且可追溯至回答内容
-- 禁止口语、幽默、表情
-- 禁止修改或建议灵根
-- 不得脑补未出现动机
-- 输出 JSON，严格遵守格式，不得多字
+4. 天道反馈 (reason)
+- 开头：经天鉴，该修士……
+- 分析回答及性格特征
+- 异常回答可加入轻微提醒，如“言辞不当，修炼之志尚待端正”
+- 宣告道号：赐予道号『(daoName)』！
+- 祝福语：愿道友……（可中性或温和，不强制积极，结合灵根特征或性格）
+- 输出古风，无表情，无口语
 
 【输出格式】
 {
   "daoName": "道号",
-  "personality": "性格评语",
-  "reason": "经天鉴，该修士……[正面描述][(可选)但……][赐予道号][祝福语]"
-}
-`
+  "personality": "性格评语（≤50字，基于回答）",
+  "reason": "经天鉴，该修士……[正面或中性描述][(可选)提醒][赐予道号『daoName』][祝福语]"
+}`
 
       // 调用 AI 服务
       const response = await aiService.generate(prompt, AIConfig.INITIATION_AI_TIMEOUT)
@@ -394,97 +392,6 @@ ${rootInfo.name}(${selectedRoot})
       this.ctx.logger('xiuxian').warn(`第三题答案过长 (${answers[2].length} 字符)，可能是注入攻击`)
       // 截断过长的答案
       answers[2] = answers[2].substring(0, 200) + '...(已截断)'
-    }
-  }
-
-  /**
-   * 生成问道包评语
-   * 用于新的Tag系统问道包
-   */
-  async generatePackageEvaluationResponse(
-    packageName: string,
-    packageDescription: string,
-    answers: string[],
-    matchRate: number,
-    tier: 'perfect' | 'good' | 'normal',
-    aiPromptHint: string
-  ): Promise<{ evaluation: string; rewardReason: string }> {
-    const aiService = this.ctx.xiuxianAI
-
-    // 检查 AI 服务是否可用
-    if (!aiService || !aiService.isAvailable()) {
-      // AI 不可用，使用默认评语
-      return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-    }
-
-    try {
-      const tierText = tier === 'perfect' ? '完美契合' : tier === 'good' ? '良好匹配' : '普通匹配'
-
-      const prompt = `你是修仙世界的天道评判者，需要根据修士在"${packageName}"中的表现生成评语。
-
-【问道包描述】
-${packageDescription}
-
-【修士回答】
-${answers.map((a, i) => `第${i + 1}题：${a || '未回答'}`).join('\n')}
-
-【匹配结果】
-匹配度：${matchRate.toFixed(1)}%
-等级：${tierText}
-评语提示：${aiPromptHint}
-
-【任务要求】
-1. evaluation：对修士此次问道表现的评价，≤50字，必须古风、修仙风格，内容紧扣回答和问道包表现，不得凭空夸大或补充。
-2. rewardReason：解释获得此等奖励原因，≤30字，明确对应修士表现，不得空泛或无关。
-
-【额外规则】
-- 严格字数限制
-- 必须与修士回答内容相关
-- 禁止口语、现代词汇、幽默或表情
-- 输出 JSON，严格遵守，不多字、不加代码块
-
-【输出格式】
-{
-  "evaluation": "评语内容",
-  "rewardReason": "奖励原因"
-}`
-
-      const response = await aiService.generate(prompt, AIConfig.PACKAGE_EVALUATION_TIMEOUT)
-
-      // 检查响应是否为空
-      if (!response) {
-        this.ctx.logger('xiuxian').warn('AI返回空响应，使用默认评语')
-        return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-      }
-
-      // 解析响应
-      const parsed = JSON.parse(response) as { evaluation?: string; rewardReason?: string }
-      return {
-        evaluation: parsed.evaluation || '问道完成',
-        rewardReason: parsed.rewardReason || '完成问道'
-      }
-    } catch (error) {
-      this.ctx.logger('xiuxian').warn('问道包AI评语生成失败，使用默认评语')
-      return this.getDefaultPackageEvaluation(tier, aiPromptHint)
-    }
-  }
-
-  /**
-   * 获取默认问道包评语
-   */
-  private getDefaultPackageEvaluation(
-    tier: 'perfect' | 'good' | 'normal',
-    aiPromptHint: string
-  ): { evaluation: string; rewardReason: string } {
-    const evaluations = {
-      perfect: '你的心性与此机缘完美契合，天道为之侧目！',
-      good: '你的表现尚可，虽有不足，但已有所得。',
-      normal: '此次机缘与你尚有距离，需继续修行。'
-    }
-
-    return {
-      evaluation: evaluations[tier],
-      rewardReason: aiPromptHint || '完成问道'
     }
   }
 }
